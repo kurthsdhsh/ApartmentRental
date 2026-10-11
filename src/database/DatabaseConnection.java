@@ -2,7 +2,7 @@ package database;
 
 import java.sql.*;
 
-/** Single place for the JDBC URL. Derby server must be running. */
+/** Single place for the JDBC URL. Everyone uses the NETWORK driver (Derby server must be running). */
 public class DatabaseConnection {
     private static final String URL = "jdbc:derby://localhost:1527/apt_db";
     private static final String USER = "app";

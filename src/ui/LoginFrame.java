@@ -6,7 +6,7 @@ import util.Session;
 
 /**
  * TEMPORARY STUB by Member 1 (Member 2 replaces it with the real login).
- * The two buttons only exist so everyone can test their module as Admin or Staff before real login exists.
+ * The two buttons only exist so everyone can test their module as Admin or Staff before the real login exists.
  */
 public class LoginFrame extends JFrame {
     public LoginFrame() {

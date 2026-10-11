@@ -2,16 +2,16 @@
 
 ## A. What Derby is
 Apache Derby (Java DB) is a database written in Java. In this project it runs as a **server** on your PC
-(port 1527). Your Java app connects to it with JDBC using `jdbc:derby://localhost:1527/ApartmentDB` (user `app`, password `app`).
+(port 1527). Your Java app connects to it with JDBC using `jdbc:derby://localhost:1527/apt_db` (user `app`, password `app`).
 A Derby database is just a **folder** on your computer, so it is NOT shared through Git. Only the `.sql` scripts are shared.
 
 ## B. Daily routine (NetBeans)
 1. NetBeans > **Services** tab > Databases > Java DB > right-click > **Start Server**.
-2. Right-click `jdbc:derby://localhost:1527/ApartmentDB` > **Connect**.
+2. Right-click `jdbc:derby://localhost:1527/apt_db` > **Connect**.
 3. Run your app. When finished you may Stop Server.
 
 ## C. Look at your data
-Services > Databases > ApartmentDB connection > Schemas > **APP** > Tables > right-click a table > **View Data**.
+Services > Databases > apt_db connection > Schemas > **APP** > Tables > right-click a table > **View Data**.
 
 ## D. Run SQL yourself
 Right-click the connection > **Execute Command**. Type a query and press Ctrl+Shift+E:
@@ -53,7 +53,7 @@ Always use PreparedStatement with `?` and try-with-resources.
     cd C:\Derby\bin
     startNetworkServer                      (starts the server)
     ij                                      (opens the SQL prompt)
-    ij> connect 'jdbc:derby://localhost:1527/ApartmentDB;user=app;password=app';
+    ij> connect 'jdbc:derby://localhost:1527/apt_db;user=app;password=app';
     ij> run 'C:\path\to\sql\schema.sql';
     ij> SELECT * FROM UNITS;
     ij> exit;
