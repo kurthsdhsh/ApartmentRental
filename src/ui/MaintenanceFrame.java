@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import javax.swing.*;
+import static javax.swing.WindowConstants.DISPOSE_ON_CLOSE;
 import javax.swing.table.DefaultTableModel;
 import model.ComboItem;
 import model.MaintenanceRequest;
