@@ -7,24 +7,28 @@ import model.User;
 import util.ErrorHelper;
 import util.Session;
 import util.Validator;
+import java.awt.Color;
+import java.awt.Dimension;
 
 public class LoginFrame extends javax.swing.JFrame {
 
     private final UserDAO userDao = new UserDAO();
 
     public LoginFrame() {
-        initComponents();                                   // NetBeans builds the screen
-        setDefaultCloseOperation(EXIT_ON_CLOSE);            // login is the ONE frame that may exit the app
-        setLocationRelativeTo(null);                        // center on screen
-        getRootPane().setDefaultButton(btnLogin);           // pressing Enter = click LOGIN
-        // look: same colors/fonts as the rest of the app (see util/Style.java)
-//        Style.styleButton(btnLogin);
-//        Style.styleButton(btnClear);
-//        Style.styleButton(btnExit);
-//        btnExit.setBackground(Style.DANGER);
-//        lblTitle.setFont(Style.TITLE);
-//        lblTitle.setForeground(Style.PRIMARY);
-//        getContentPane().setBackground(Style.BG);
+        setContentPane(new BackgroundPanel("/images/login_bg.png"));   
+        initComponents();
+
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        getRootPane().setDefaultButton(btnLogin);
+        getContentPane().setPreferredSize(new Dimension(760, 480));    // your picture's size
+        pack();
+        setLocationRelativeTo(null);
+
+        // button colors (Windows needs this one line each)
+        PillButtonUI.apply(btnLogin, new Color(190, 92, 142), Color.WHITE);
+        PillButtonUI.apply(btnClear, new Color(160, 160, 160), Color.WHITE);
+        PillButtonUI.apply(btnExit,  new Color(190, 50, 50),  Color.WHITE);
+
         txtUsername.requestFocus();
     }
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
@@ -38,18 +42,29 @@ public class LoginFrame extends javax.swing.JFrame {
         btnLogin = new javax.swing.JButton();
         btnClear = new javax.swing.JButton();
         btnExit = new javax.swing.JButton();
+        jLabel1 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("LOGIN");
         setBackground(new java.awt.Color(51, 0, 51));
         setForeground(java.awt.Color.yellow);
+        setPreferredSize(new java.awt.Dimension(760, 480));
         setResizable(false);
+        setSize(new java.awt.Dimension(21, 12));
 
+        lblTitle.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblTitle.setForeground(new java.awt.Color(255, 0, 153));
         lblTitle.setText("APARTMENT RENTAL MANAGEMENT SYSTEM");
 
         lblUsername.setText("Username:");
 
+        txtUsername.setText("Enter your username");
+        txtUsername.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
+        txtUsername.addActionListener(this::txtUsernameActionPerformed);
+
         lblPassword.setText("Password:");
+
+        txtPassword.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
 
         btnLogin.setText("LOGIN");
         btnLogin.addActionListener(this::btnLoginActionPerformed);
@@ -60,39 +75,45 @@ public class LoginFrame extends javax.swing.JFrame {
         btnExit.setText("EXIT");
         btnExit.addActionListener(this::btnExitActionPerformed);
 
+        jLabel1.setFont(new java.awt.Font("Segoe UI Semibold", 0, 14)); // NOI18N
+        jLabel1.setForeground(new java.awt.Color(255, 0, 200));
+        jLabel1.setText("LOG-IN");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                .addContainerGap(375, Short.MAX_VALUE)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
-                        .addGap(21, 21, 21)
-                        .addComponent(lblTitle))
-                    .addGroup(layout.createSequentialGroup()
-                        .addGap(188, 188, 188)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                             .addComponent(lblPassword)
                             .addComponent(lblUsername))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addComponent(txtUsername)
-                            .addComponent(txtPassword, javax.swing.GroupLayout.DEFAULT_SIZE, 176, Short.MAX_VALUE)))
+                            .addComponent(txtPassword, javax.swing.GroupLayout.PREFERRED_SIZE, 176, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addComponent(lblTitle)
                     .addGroup(layout.createSequentialGroup()
-                        .addGap(222, 222, 222)
-                        .addComponent(btnExit)
-                        .addGap(18, 18, 18)
-                        .addComponent(btnClear)
-                        .addGap(18, 18, 18)
-                        .addComponent(btnLogin)))
-                .addContainerGap(6914, Short.MAX_VALUE))
+                        .addGap(2, 2, 2)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                            .addComponent(btnLogin, javax.swing.GroupLayout.PREFERRED_SIZE, 241, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(btnExit, javax.swing.GroupLayout.PREFERRED_SIZE, 112, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(btnClear, javax.swing.GroupLayout.PREFERRED_SIZE, 123, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                    .addComponent(jLabel1))
+                .addGap(78, 78, 78))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addGap(16, 16, 16)
+                .addGap(127, 127, 127)
                 .addComponent(lblTitle)
-                .addGap(51, 51, 51)
+                .addGap(42, 42, 42)
+                .addComponent(jLabel1)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(lblUsername)
                     .addComponent(txtUsername, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -100,12 +121,13 @@ public class LoginFrame extends javax.swing.JFrame {
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(lblPassword)
                     .addComponent(txtPassword, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(18, 18, 18)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(btnLogin)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(btnLogin)
-                    .addComponent(btnClear)
-                    .addComponent(btnExit))
-                .addContainerGap(679, Short.MAX_VALUE))
+                    .addComponent(btnExit)
+                    .addComponent(btnClear))
+                .addContainerGap(264, Short.MAX_VALUE))
         );
 
         pack();
@@ -152,11 +174,16 @@ public class LoginFrame extends javax.swing.JFrame {
         if (ok == JOptionPane.YES_OPTION) System.exit(0);
     }//GEN-LAST:event_btnExitActionPerformed
 
+    private void txtUsernameActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtUsernameActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_txtUsernameActionPerformed
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnClear;
     private javax.swing.JButton btnExit;
     private javax.swing.JButton btnLogin;
+    private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel lblPassword;
     private javax.swing.JLabel lblTitle;
     private javax.swing.JLabel lblUsername;
