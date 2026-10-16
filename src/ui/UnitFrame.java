@@ -200,8 +200,10 @@ private Unit readForm() {
         btnSave.addActionListener(this::btnSaveActionPerformed);
 
         btnDelete.setText("DELETE");
+        btnDelete.addActionListener(this::btnDeleteActionPerformed);
 
         btnUpdate.setText("UPDATE");
+        btnUpdate.addActionListener(this::btnUpdateActionPerformed);
 
         btnClear.setText("CLEAR");
         btnClear.addActionListener(this::btnClearActionPerformed);
@@ -309,11 +311,13 @@ private Unit readForm() {
 
         lblFilter.setText("Status:");
 
-        cmbFilterStatus.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "All ", "Available", "Occupied", "Maintenance" }));
+        cmbFilterStatus.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "All", "Available", "Occupied", "Maintenance" }));
 
         btnSearch.setText("SEARCH");
+        btnSearch.addActionListener(this::btnSearchActionPerformed);
 
         btnRefresh.setText("REFRESH");
+        btnRefresh.addActionListener(this::btnRefreshActionPerformed);
 
         javax.swing.GroupLayout pnlSearchLayout = new javax.swing.GroupLayout(pnlSearch);
         pnlSearch.setLayout(pnlSearchLayout);
@@ -455,6 +459,72 @@ private Unit readForm() {
     private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed
         clearForm();
     }//GEN-LAST:event_btnClearActionPerformed
+
+    private void btnUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnUpdateActionPerformed
+        if (txtUnitId.getText().isEmpty()) {
+            warn("Select a unit from the table first.");
+            return;
+        }
+        Unit u = readForm();
+        if (u == null) return;
+        u.setUnitId(Integer.parseInt(txtUnitId.getText()));
+
+        try {
+            dao.update(u);
+            JOptionPane.showMessageDialog(this, "Unit updated successfully.");
+            clearForm();
+            refreshTable();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnUpdateActionPerformed
+
+    private void btnDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDeleteActionPerformed
+        if (txtUnitId.getText().isEmpty()) {
+            warn("Select a unit from the table first.");
+            return;
+        }
+        int id = Integer.parseInt(txtUnitId.getText());
+
+        int ok = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to delete this record?",
+                "Confirm Delete", JOptionPane.YES_NO_OPTION);
+        if (ok != JOptionPane.YES_OPTION) return;
+
+        try {
+            if (dao.hasHistory(id)) {
+                JOptionPane.showMessageDialog(this,
+                        "This unit has contract or maintenance history and cannot be deleted. Set it to Maintenance instead.",
+                        "Cannot Delete", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            dao.delete(id);
+            JOptionPane.showMessageDialog(this, "Unit deleted.");
+            clearForm();
+            refreshTable();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnDeleteActionPerformed
+
+    private void btnSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSearchActionPerformed
+        try {
+            List<Unit> list = dao.search(txtSearch.getText(),
+                    cmbFilterStatus.getSelectedItem().toString());
+            fillTable(list);
+            if (list.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No records found.");
+            }
+        } catch (SQLException ex) {
+            ErrorHelper.show(this, ex);
+        }
+    }//GEN-LAST:event_btnSearchActionPerformed
+
+    private void btnRefreshActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRefreshActionPerformed
+        txtSearch.setText("");
+        cmbFilterStatus.setSelectedIndex(0);
+        refreshTable();
+    }//GEN-LAST:event_btnRefreshActionPerformed
 
     /**
      * @param args the command line arguments
