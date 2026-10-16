@@ -63,7 +63,7 @@
               <Component id="pnlSearch" min="-2" max="-2" attributes="0"/>
               <EmptySpace max="-2" attributes="0"/>
               <Component id="scrlUnits" min="-2" pref="277" max="-2" attributes="0"/>
-              <EmptySpace pref="157" max="32767" attributes="0"/>
+              <EmptySpace pref="247" max="32767" attributes="0"/>
           </Group>
       </Group>
     </DimensionLayout>
@@ -390,6 +390,9 @@
       </SubComponents>
     </Container>
     <Container class="javax.swing.JScrollPane" name="scrlUnits">
+      <Events>
+        <EventHandler event="mouseClicked" listener="java.awt.event.MouseListener" parameters="java.awt.event.MouseEvent" handler="scrlUnitsMouseClicked"/>
+      </Events>
 
       <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
       <SubComponents>
@@ -407,6 +410,9 @@
             </Property>
             <Property name="selectionMode" type="int" value="0"/>
           </Properties>
+          <Events>
+            <EventHandler event="mouseClicked" listener="java.awt.event.MouseListener" parameters="java.awt.event.MouseEvent" handler="tblUnitsMouseClicked"/>
+          </Events>
         </Component>
       </SubComponents>
     </Container>

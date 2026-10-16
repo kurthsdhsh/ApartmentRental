@@ -8,6 +8,16 @@ package ui;
  *
  * @author diana
  */
+
+import dao.UnitDAO;
+import java.sql.SQLException;
+import java.util.List;
+import javax.swing.JOptionPane;
+import javax.swing.table.DefaultTableModel;
+import model.Unit;
+import util.ErrorHelper;
+import util.Session;
+
 public class UnitFrame extends javax.swing.JFrame {
     
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(UnitFrame.class.getName());
@@ -15,9 +25,39 @@ public class UnitFrame extends javax.swing.JFrame {
     /**
      * Creates new form UnitFrame
      */
+    
+    private final UnitDAO dao = new UnitDAO(); // frame connection to the dbase layer
+    
     public UnitFrame() {
         initComponents();
+        setLocationRelativeTo(null);
+        txtUnitId.setEditable(false);
+        btnDelete.setEnabled(Session.isAdmin());
+        refreshTable();
     }
+    
+    private void refreshTable() {
+    try {
+        fillTable(dao.getAll());
+    } catch (SQLException ex) {
+        ErrorHelper.show(this, ex);
+    }
+}
+    
+    private void fillTable(List<Unit> list) {
+    DefaultTableModel m = (DefaultTableModel) tblUnits.getModel();
+    m.setRowCount(0);
+    for (Unit u : list) {
+        m.addRow(new Object[]{
+            u.getUnitId(),
+            u.getUnitNo(),
+            u.getUnitType(),
+            u.getFloorNo(),
+            u.getMonthlyRent(),
+            u.getStatus()
+        });
+    }
+}
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -239,6 +279,12 @@ public class UnitFrame extends javax.swing.JFrame {
                 .addGap(13, 13, 13))
         );
 
+        scrlUnits.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                scrlUnitsMouseClicked(evt);
+            }
+        });
+
         tblUnits.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
@@ -256,6 +302,11 @@ public class UnitFrame extends javax.swing.JFrame {
             }
         });
         tblUnits.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+        tblUnits.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tblUnitsMouseClicked(evt);
+            }
+        });
         scrlUnits.setViewportView(tblUnits);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -287,7 +338,7 @@ public class UnitFrame extends javax.swing.JFrame {
                 .addComponent(pnlSearch, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(scrlUnits, javax.swing.GroupLayout.PREFERRED_SIZE, 277, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(157, Short.MAX_VALUE))
+                .addContainerGap(247, Short.MAX_VALUE))
         );
 
         pack();
@@ -300,6 +351,21 @@ public class UnitFrame extends javax.swing.JFrame {
     private void btnSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSaveActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_btnSaveActionPerformed
+
+    private void scrlUnitsMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_scrlUnitsMouseClicked
+        // TODO add your handling code here:
+    }//GEN-LAST:event_scrlUnitsMouseClicked
+
+    private void tblUnitsMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblUnitsMouseClicked
+        int r = tblUnits.getSelectedRow();
+        if (r < 0) return;
+
+        txtUnitId.setText(tblUnits.getValueAt(r, 0).toString());
+        txtUnitNo.setText(tblUnits.getValueAt(r, 1).toString());
+        cmbUnitType.setSelectedItem(tblUnits.getValueAt(r, 2).toString());
+        txtFloor.setText(tblUnits.getValueAt(r, 3).toString());
+        txtRent.setText(tblUnits.getValueAt(r, 4).toString());
+        cmbStatus.setSelectedItem(tblUnits.getValueAt(r, 5).toString());    }//GEN-LAST:event_tblUnitsMouseClicked
 
     /**
      * @param args the command line arguments
