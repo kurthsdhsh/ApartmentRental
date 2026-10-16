@@ -3,7 +3,22 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/GUIForms/JFrame.java to edit this template
  */
 package ui;
-
+import dao.ContractDAO;
+import dao.PaymentDAO;
+import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.List;
+import javax.swing.JComboBox;
+import javax.swing.JOptionPane;
+import javax.swing.table.DefaultTableModel;
+import model.ComboItem;
+import model.Contract;
+import model.Payment;
+import model.User;
+import util.ErrorHelper;
+import util.Session;
 /**
  *
  * @author diana
@@ -11,13 +26,119 @@ package ui;
 public class PaymentFrame extends javax.swing.JFrame {
     
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(PaymentFrame.class.getName());
+    
+    private final PaymentDAO dao = new PaymentDAO();
+    private final ContractDAO contractDao = new ContractDAO();
+    private boolean loading = false; 
 
-    /**
-     * Creates new form PaymentFrame
-     */
     public PaymentFrame() {
         initComponents();
+        setLocationRelativeTo(null);
+        txtPaymentId.setEditable(false);       
+        btnDelete.setEnabled(Session.isAdmin());  
+        loadActiveContracts();
+        resetDefaults();
+        refreshTable();
+        updateSummary();
     }
+    
+    @SuppressWarnings({"unchecked", "rawtypes"})
+private static void addItem(JComboBox combo, ComboItem item) {
+    combo.addItem(item);
+}
+
+// lists only active contracts
+private void loadActiveContracts() {
+    loading = true;
+    try {
+        cmbContract.removeAllItems();
+        List<Contract> list = contractDao.getActiveContracts();
+        for (Contract k : list) {
+            addItem(cmbContract, new ComboItem(k.getContractId(),
+                    "C-" + k.getContractId() + " | Unit " + k.getUnitNo() + " | " + k.getTenantName()));
+        }
+        if (list.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No active contracts. Create a contract first.");
+        }
+    } catch (SQLException ex) {
+        ErrorHelper.show(this, ex);
+    } finally {
+        loading = false;
+    }
+    fillAmountFromSelectedContract();
+}
+
+//copies the selected contract's monthly rent
+private void fillAmountFromSelectedContract() {
+    Object sel = cmbContract.getSelectedItem();
+    if (!(sel instanceof ComboItem)) {
+        txtAmount.setText("");
+        return;
+    }
+    try {
+        Contract k = contractDao.getById(((ComboItem) sel).getId());
+        if (k != null) txtAmount.setText(k.getMonthlyRent().toPlainString());
+    } catch (SQLException ex) {
+        ErrorHelper.show(this, ex);
+    }
+}
+
+private void showReceivedBy() {
+    User u = Session.getCurrentUser();
+    lblReceivedBy.setText(u == null ? "-" : u.getFullName());
+}
+
+private void resetDefaults() {
+    txtPaymentId.setText("");
+    txtBillingMonth.setText(YearMonth.now().toString()); 
+    txtPaymentDate.setText(LocalDate.now().toString());  
+    cmbMethod.setSelectedIndex(0);
+    cmbStatus.setSelectedItem("Paid");
+    txtRemarks.setText("");
+    showReceivedBy();
+}
+
+private void refreshTable() {
+    try {
+        fillTable(dao.getAll());
+    } catch (SQLException ex) {
+        ErrorHelper.show(this, ex);
+    }
+}
+
+private void fillTable(List<Payment> list) {
+    DefaultTableModel m = (DefaultTableModel) tblPayments.getModel();
+    m.setRowCount(0);
+    for (Payment p : list) {
+        m.addRow(new Object[]{
+            p.getPaymentId(),
+            p.getTenantName(),
+            p.getUnitNo(),
+            p.getBillingMonth(),
+            p.getPaymentDate(),
+            p.getAmount(),
+            p.getPaymentMethod(),
+            p.getStatus(),
+            p.getReceivedBy()
+        });
+    }
+}
+
+private void updateSummary() {
+    try {
+        BigDecimal total = dao.totalForMonth(YearMonth.now().toString());
+        lblSummary.setText(String.format("Total collected this month: PHP %,.2f", total));
+    } catch (SQLException ex) {
+        ErrorHelper.show(this, ex);
+    }
+}
+
+private void clearForm() {
+    resetDefaults();
+    cmbContract.setEnabled(true);   
+    tblPayments.clearSelection();
+    loadActiveContracts();   
+}
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -49,11 +170,19 @@ public class PaymentFrame extends javax.swing.JFrame {
         lblRemarks = new javax.swing.JLabel();
         txtRemarks = new javax.swing.JTextField();
         jPanel1 = new javax.swing.JPanel();
-        jButton1 = new javax.swing.JButton();
-        jButton2 = new javax.swing.JButton();
-        jButton3 = new javax.swing.JButton();
-        jButton4 = new javax.swing.JButton();
-        jButton5 = new javax.swing.JButton();
+        btnSave = new javax.swing.JButton();
+        btnUpdate = new javax.swing.JButton();
+        btnVoid = new javax.swing.JButton();
+        btnDelete = new javax.swing.JButton();
+        btnClear = new javax.swing.JButton();
+        jPanel2 = new javax.swing.JPanel();
+        lblSearch = new javax.swing.JLabel();
+        txtSearch = new javax.swing.JTextField();
+        btnSearch = new javax.swing.JButton();
+        btnRefresh = new javax.swing.JButton();
+        scrlPayments = new javax.swing.JScrollPane();
+        tblPayments = new javax.swing.JTable();
+        lblSummary = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Payment Management");
@@ -66,9 +195,10 @@ public class PaymentFrame extends javax.swing.JFrame {
         lblPaymentId.setText("Payment ID");
 
         txtPaymentId.setEditable(false);
-        txtPaymentId.setText("jTextField1");
 
         lblContract.setText("Contract");
+
+        cmbContract.addActionListener(this::cmbContractActionPerformed);
 
         lblMonth.setText("Billing Month");
 
@@ -90,15 +220,17 @@ public class PaymentFrame extends javax.swing.JFrame {
 
         lblRemarks.setText("Remarks");
 
-        jButton1.setText("SAVE");
+        btnSave.setText("SAVE");
 
-        jButton2.setText("UPDATE");
+        btnUpdate.setText("UPDATE");
 
-        jButton3.setText("VOID PAYMENT");
+        btnVoid.setText("VOID PAYMENT");
 
-        jButton4.setText("DELETE");
+        btnDelete.setText("DELETE");
+        btnDelete.addActionListener(this::btnDeleteActionPerformed);
 
-        jButton5.setText("CLEAR");
+        btnClear.setText("CLEAR");
+        btnClear.addActionListener(this::btnClearActionPerformed);
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
@@ -106,28 +238,28 @@ public class PaymentFrame extends javax.swing.JFrame {
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addGap(49, 49, 49)
-                .addComponent(jButton1)
-                .addGap(39, 39, 39)
-                .addComponent(jButton2)
+                .addComponent(btnSave)
+                .addGap(30, 30, 30)
+                .addComponent(btnUpdate)
                 .addGap(34, 34, 34)
-                .addComponent(jButton3, javax.swing.GroupLayout.PREFERRED_SIZE, 136, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(btnVoid, javax.swing.GroupLayout.PREFERRED_SIZE, 136, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(31, 31, 31)
-                .addComponent(jButton4)
+                .addComponent(btnDelete)
                 .addGap(39, 39, 39)
-                .addComponent(jButton5)
-                .addContainerGap(63, Short.MAX_VALUE))
+                .addComponent(btnClear)
+                .addContainerGap(108, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jButton1)
-                    .addComponent(jButton2)
-                    .addComponent(jButton3)
-                    .addComponent(jButton4)
-                    .addComponent(jButton5))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addComponent(btnSave)
+                    .addComponent(btnUpdate)
+                    .addComponent(btnVoid)
+                    .addComponent(btnDelete)
+                    .addComponent(btnClear))
+                .addContainerGap(16, Short.MAX_VALUE))
         );
 
         javax.swing.GroupLayout pnlFormLayout = new javax.swing.GroupLayout(pnlForm);
@@ -224,8 +356,70 @@ public class PaymentFrame extends javax.swing.JFrame {
                             .addComponent(cmbStatus, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
                 .addGap(28, 28, 28)
                 .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(80, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
+
+        lblSearch.setText("Search:");
+
+        btnSearch.setText("SEARCH");
+        btnSearch.addActionListener(this::btnSearchActionPerformed);
+
+        btnRefresh.setText("REFRESH");
+
+        javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
+        jPanel2.setLayout(jPanel2Layout);
+        jPanel2Layout.setHorizontalGroup(
+            jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel2Layout.createSequentialGroup()
+                .addGap(33, 33, 33)
+                .addComponent(lblSearch, javax.swing.GroupLayout.PREFERRED_SIZE, 59, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(txtSearch, javax.swing.GroupLayout.PREFERRED_SIZE, 330, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(36, 36, 36)
+                .addComponent(btnSearch)
+                .addGap(39, 39, 39)
+                .addComponent(btnRefresh)
+                .addContainerGap(162, Short.MAX_VALUE))
+        );
+        jPanel2Layout.setVerticalGroup(
+            jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel2Layout.createSequentialGroup()
+                .addContainerGap(15, Short.MAX_VALUE)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(lblSearch)
+                    .addComponent(txtSearch, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(btnSearch)
+                        .addComponent(btnRefresh)))
+                .addGap(10, 10, 10))
+        );
+
+        tblPayments.setModel(new javax.swing.table.DefaultTableModel(
+            new Object [][] {
+
+            },
+            new String [] {
+                "ID", "Tenant", "Unit", "Billing Month", "Payment Date", "Amount", "Method", "Status", "Received By"
+            }
+        ) {
+            boolean[] canEdit = new boolean [] {
+                false, false, false, false, false, false, false, false, false
+            };
+
+            public boolean isCellEditable(int rowIndex, int columnIndex) {
+                return canEdit [columnIndex];
+            }
+        });
+        tblPayments.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+        tblPayments.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tblPaymentsMouseClicked(evt);
+            }
+        });
+        scrlPayments.setViewportView(tblPayments);
+
+        lblSummary.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblSummary.setText("Total collected this month: PHP 0.00");
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -237,7 +431,13 @@ public class PaymentFrame extends javax.swing.JFrame {
                 .addGap(270, 270, 270))
             .addGroup(layout.createSequentialGroup()
                 .addGap(37, 37, 37)
-                .addComponent(pnlForm, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(pnlForm, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(scrlPayments)
+                    .addGroup(layout.createSequentialGroup()
+                        .addComponent(lblSummary, javax.swing.GroupLayout.PREFERRED_SIZE, 393, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
         layout.setVerticalGroup(
@@ -247,11 +447,68 @@ public class PaymentFrame extends javax.swing.JFrame {
                 .addComponent(jLabel1)
                 .addGap(18, 18, 18)
                 .addComponent(pnlForm, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(100, Short.MAX_VALUE))
+                .addGap(18, 18, 18)
+                .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(scrlPayments, javax.swing.GroupLayout.PREFERRED_SIZE, 269, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
+                .addComponent(lblSummary)
+                .addContainerGap(23, Short.MAX_VALUE))
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
+
+    private void btnDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDeleteActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_btnDeleteActionPerformed
+
+    private void btnSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSearchActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_btnSearchActionPerformed
+
+    private void cmbContractActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbContractActionPerformed
+        if (loading || !cmbContract.isEnabled()) return;
+        fillAmountFromSelectedContract();
+    }//GEN-LAST:event_cmbContractActionPerformed
+
+    private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed
+        clearForm();
+    }//GEN-LAST:event_btnClearActionPerformed
+
+    private void tblPaymentsMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblPaymentsMouseClicked
+        int r = tblPayments.getSelectedRow();
+        if (r < 0) return;
+
+        try {
+            int id = Integer.parseInt(tblPayments.getValueAt(r, 0).toString());
+            Payment p = dao.getById(id); 
+            if (p == null) {
+                JOptionPane.showMessageDialog(this, "This payment no longer exists. Click REFRESH.");
+                return;
+            }
+
+            txtPaymentId.setText(String.valueOf(p.getPaymentId()));
+
+            loading = true;
+            cmbContract.removeAllItems();
+            addItem(cmbContract, new ComboItem(p.getContractId(),
+                    "C-" + p.getContractId() + " | Unit " + p.getUnitNo() + " | " + p.getTenantName()));
+            loading = false;
+
+            txtBillingMonth.setText(p.getBillingMonth());
+            txtPaymentDate.setText(p.getPaymentDate().toString());
+            txtAmount.setText(p.getAmount().toPlainString());
+            cmbMethod.setSelectedItem(p.getPaymentMethod());
+            cmbStatus.setSelectedItem(p.getStatus());
+            lblReceivedBy.setText(p.getReceivedBy());
+            txtRemarks.setText(p.getRemarks() == null ? "" : p.getRemarks());
+
+            cmbContract.setEnabled(false);
+        } catch (SQLException ex) {
+            ErrorHelper.show(this, ex);
+        }
+    }//GEN-LAST:event_tblPaymentsMouseClicked
 
     /**
      * @param args the command line arguments
@@ -281,19 +538,17 @@ public class PaymentFrame extends javax.swing.JFrame {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnClear;
     private javax.swing.JButton btnDelete;
-    private javax.swing.JButton btnEnd;
+    private javax.swing.JButton btnRefresh;
     private javax.swing.JButton btnSave;
+    private javax.swing.JButton btnSearch;
     private javax.swing.JButton btnUpdate;
+    private javax.swing.JButton btnVoid;
     private javax.swing.JComboBox<String> cmbContract;
     private javax.swing.JComboBox<String> cmbMethod;
     private javax.swing.JComboBox<String> cmbStatus;
-    private javax.swing.JButton jButton1;
-    private javax.swing.JButton jButton2;
-    private javax.swing.JButton jButton3;
-    private javax.swing.JButton jButton4;
-    private javax.swing.JButton jButton5;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JPanel jPanel1;
+    private javax.swing.JPanel jPanel2;
     private javax.swing.JLabel lblAmount;
     private javax.swing.JLabel lblContract;
     private javax.swing.JLabel lblMethod;
@@ -303,13 +558,17 @@ public class PaymentFrame extends javax.swing.JFrame {
     private javax.swing.JLabel lblReceivedBy;
     private javax.swing.JLabel lblReceivedByCaption;
     private javax.swing.JLabel lblRemarks;
+    private javax.swing.JLabel lblSearch;
     private javax.swing.JLabel lblStatus;
-    private javax.swing.JPanel pnlButtons;
+    private javax.swing.JLabel lblSummary;
     private javax.swing.JPanel pnlForm;
+    private javax.swing.JScrollPane scrlPayments;
+    private javax.swing.JTable tblPayments;
     private javax.swing.JTextField txtAmount;
     private javax.swing.JTextField txtBillingMonth;
     private javax.swing.JTextField txtPaymentDate;
     private javax.swing.JTextField txtPaymentId;
     private javax.swing.JTextField txtRemarks;
+    private javax.swing.JTextField txtSearch;
     // End of variables declaration//GEN-END:variables
 }
