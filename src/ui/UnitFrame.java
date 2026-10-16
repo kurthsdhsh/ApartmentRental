@@ -75,6 +75,8 @@ private void showDbError(SQLException ex) {
 }
 
 private void clearForm() {
+    applyOccupiedLock(false);
+    
     txtUnitId.setText("");
     txtUnitNo.setText("");
     cmbUnitType.setSelectedIndex(0);
@@ -83,6 +85,11 @@ private void clearForm() {
     cmbStatus.setSelectedIndex(0);
     tblUnits.clearSelection();
     txtUnitNo.requestFocus();
+}
+
+// status can only be changed by Contracts
+private void applyOccupiedLock(boolean occupied) {
+    cmbStatus.setEnabled(!occupied);
 }
 
 // validates the form
@@ -454,7 +461,10 @@ private Unit readForm() {
         cmbUnitType.setSelectedItem(tblUnits.getValueAt(r, 2).toString());
         txtFloor.setText(tblUnits.getValueAt(r, 3).toString());
         txtRent.setText(tblUnits.getValueAt(r, 4).toString());
-        cmbStatus.setSelectedItem(tblUnits.getValueAt(r, 5).toString());    }//GEN-LAST:event_tblUnitsMouseClicked
+        cmbStatus.setSelectedItem(tblUnits.getValueAt(r, 5).toString());
+        
+        applyOccupiedLock(Constants.UNIT_OCCUPIED.equals(tblUnits.getValueAt(r, 5).toString()));
+    }//GEN-LAST:event_tblUnitsMouseClicked
 
     private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed
         clearForm();
@@ -462,21 +472,38 @@ private Unit readForm() {
 
     private void btnUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnUpdateActionPerformed
         if (txtUnitId.getText().isEmpty()) {
-            warn("Select a unit from the table first.");
-            return;
-        }
-        Unit u = readForm();
-        if (u == null) return;
-        u.setUnitId(Integer.parseInt(txtUnitId.getText()));
+           warn("Select a unit from the table first.");
+           return;
+       }
+       Unit u = readForm();
+       if (u == null) return;
+       int id = Integer.parseInt(txtUnitId.getText());
+       u.setUnitId(id);
 
-        try {
-            dao.update(u);
-            JOptionPane.showMessageDialog(this, "Unit updated successfully.");
-            clearForm();
-            refreshTable();
-        } catch (SQLException ex) {
-            showDbError(ex);
-        }
+       try {
+           Unit current = dao.getById(id);        
+           if (current == null) {
+               warn("This unit no longer exists. Click REFRESH.");
+               return;
+           }
+           boolean wasOccupied = Constants.UNIT_OCCUPIED.equals(current.getStatus());
+           boolean wantsOccupied = Constants.UNIT_OCCUPIED.equals(u.getStatus());
+
+           if (!wasOccupied && wantsOccupied) {
+               warn("A unit becomes Occupied only when a contract is created.");
+               return;
+           }
+           if (wasOccupied) {
+               u.setStatus(Constants.UNIT_OCCUPIED); // only Contracts can free it
+           }
+
+           dao.update(u);
+           JOptionPane.showMessageDialog(this, "Unit updated successfully.");
+           clearForm();
+           refreshTable();
+       } catch (SQLException ex) {
+           showDbError(ex);
+       }
     }//GEN-LAST:event_btnUpdateActionPerformed
 
     private void btnDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDeleteActionPerformed
