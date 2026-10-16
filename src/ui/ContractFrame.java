@@ -17,6 +17,12 @@ import model.Tenant;
 import model.Unit;
 import util.ErrorHelper;
 import util.Session;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import util.Constants;
+import util.Validator;
 /**
  *
  * @author diana
@@ -145,6 +151,77 @@ private void clearForm() {
     loadAvailableUnits();
 }
 
+private void warn(String message) {
+    JOptionPane.showMessageDialog(this, message, "Validation", JOptionPane.WARNING_MESSAGE);
+}
+
+private void showDbError(SQLException ex) {
+    String msg = ex.getMessage();
+    if (ex.getSQLState() == null && msg != null && msg.startsWith("This ")) {
+        JOptionPane.showMessageDialog(this, msg, "Cannot Continue", JOptionPane.WARNING_MESSAGE);
+        loadAvailableUnits(); 
+    } else {
+        ErrorHelper.show(this, ex);
+    }
+}
+
+// validates the form
+private Contract readForm() {
+    Object t = cmbTenant.getSelectedItem();
+    if (!(t instanceof ComboItem)) {
+        warn("Select a tenant.");
+        return null;
+    }
+    Object u = cmbUnit.getSelectedItem();
+    if (!(u instanceof ComboItem)) {
+        warn("Select a unit. If the list is empty, add a unit or end a contract first.");
+        return null;
+    }
+
+    LocalDate start, end;
+    try {
+        start = Validator.parseDate(txtStartDate.getText());
+        end = Validator.parseDate(txtEndDate.getText());
+    } catch (DateTimeParseException ex) {
+        warn("Dates must be valid and use yyyy-MM-dd, for example 2026-10-07.");
+        return null;
+    }
+    if (!end.isAfter(start)) {
+        warn("End date must be after the start date.");
+        txtEndDate.requestFocus();
+        return null;
+    }
+
+    BigDecimal rent;
+    try {
+        rent = Validator.parsePositive(txtRent.getText());
+    } catch (NumberFormatException ex) {
+        warn("Monthly rent must be a number greater than 0.");
+        txtRent.requestFocus();
+        return null;
+    }
+
+    BigDecimal deposit;
+    try {
+        deposit = new BigDecimal(txtDeposit.getText().trim());
+        if (deposit.compareTo(BigDecimal.ZERO) < 0) throw new NumberFormatException();
+    } catch (NumberFormatException ex) {
+        warn("Deposit must be a number of 0 or more.");
+        txtDeposit.requestFocus();
+        return null;
+    }
+
+    Contract k = new Contract();
+    k.setTenantId(((ComboItem) t).getId());
+    k.setUnitId(((ComboItem) u).getId());
+    k.setStartDate(start);
+    k.setEndDate(end);
+    k.setMonthlyRent(rent);
+    k.setDeposit(deposit);
+    k.setStatus(Constants.CONTRACT_ACTIVE);
+    return k;
+}
+
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -225,15 +302,8 @@ private void clearForm() {
         cmbStatus.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Active", "Ended", "Terminated" }));
         cmbStatus.setEnabled(false);
 
-        txtStartDate.setEditable(false);
-
-        txtEndDate.setEditable(false);
-
-        txtRent.setEditable(false);
-
-        txtDeposit.setEditable(false);
-
         btnSave.setText("SAVE");
+        btnSave.addActionListener(this::btnSaveActionPerformed);
 
         btnUpdate.setText("UPDATE");
 
@@ -532,6 +602,24 @@ private void clearForm() {
             ErrorHelper.show(this, ex);
         }
     }//GEN-LAST:event_tblContractsMouseClicked
+
+    private void btnSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSaveActionPerformed
+        if (!txtContractId.getText().isEmpty()) {
+            warn("A contract is selected. Click CLEAR first to create a new contract.");
+            return;
+        }
+        Contract k = readForm();
+        if (k == null) return; // validation failed
+
+        try {
+            dao.createContract(k); // insert contract + unit becomes occpued, in one transaction
+            JOptionPane.showMessageDialog(this, "Contract created successfully.");
+            clearForm();
+            refreshTable();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnSaveActionPerformed
 
     /**
      * @param args the command line arguments
