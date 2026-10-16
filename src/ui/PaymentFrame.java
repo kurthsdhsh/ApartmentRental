@@ -301,8 +301,10 @@ private Payment readForm() {
         btnSave.addActionListener(this::btnSaveActionPerformed);
 
         btnUpdate.setText("UPDATE");
+        btnUpdate.addActionListener(this::btnUpdateActionPerformed);
 
         btnVoid.setText("VOID PAYMENT");
+        btnVoid.addActionListener(this::btnVoidActionPerformed);
 
         btnDelete.setText("DELETE");
         btnDelete.addActionListener(this::btnDeleteActionPerformed);
@@ -443,6 +445,7 @@ private Payment readForm() {
         btnSearch.addActionListener(this::btnSearchActionPerformed);
 
         btnRefresh.setText("REFRESH");
+        btnRefresh.addActionListener(this::btnRefreshActionPerformed);
 
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);
@@ -538,11 +541,36 @@ private Payment readForm() {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDeleteActionPerformed
-        // TODO add your handling code here:
+        if (txtPaymentId.getText().isEmpty()) {
+            warn("Select a payment from the table first.");
+            return;
+        }
+        int ok = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to delete this record?\n(Voiding keeps the history. Delete removes it permanently.)",
+                "Confirm Delete", JOptionPane.YES_NO_OPTION);
+        if (ok != JOptionPane.YES_OPTION) return;
+
+        try {
+            dao.delete(Integer.parseInt(txtPaymentId.getText()));
+            JOptionPane.showMessageDialog(this, "Payment deleted.");
+            clearForm();
+            refreshTable();
+            updateSummary();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
     }//GEN-LAST:event_btnDeleteActionPerformed
 
     private void btnSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSearchActionPerformed
-        // TODO add your handling code here:
+        try {
+            List<Payment> list = dao.search(txtSearch.getText());
+            fillTable(list);
+            if (list.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No records found.");
+            }
+        } catch (SQLException ex) {
+            ErrorHelper.show(this, ex);
+        }
     }//GEN-LAST:event_btnSearchActionPerformed
 
     private void cmbContractActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbContractActionPerformed
@@ -619,6 +647,77 @@ private Payment readForm() {
             showDbError(ex);
         }
     }//GEN-LAST:event_btnSaveActionPerformed
+
+    private void btnUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnUpdateActionPerformed
+        if (txtPaymentId.getText().isEmpty()) {
+            warn("Select a payment from the table first.");
+            return;
+        }
+        if (Constants.PAY_VOIDED.equals(cmbStatus.getSelectedItem().toString())) {
+            warn("A voided payment cannot be edited.");
+            return;
+        }
+        Payment p = readForm();
+        if (p == null) return;
+        p.setPaymentId(Integer.parseInt(txtPaymentId.getText()));
+
+        try {
+            Payment current = dao.getById(p.getPaymentId()); 
+            if (current == null) {
+                warn("This payment no longer exists. Click REFRESH.");
+                return;
+            }
+            if (Constants.PAY_VOIDED.equals(current.getStatus())) {
+                warn("A voided payment cannot be edited.");
+                return;
+            }
+            dao.update(p);
+            JOptionPane.showMessageDialog(this, "Payment updated successfully.");
+            clearForm();
+            refreshTable();
+            updateSummary();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnUpdateActionPerformed
+
+    private void btnVoidActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnVoidActionPerformed
+        if (txtPaymentId.getText().isEmpty()) {
+            warn("Select a payment from the table first.");
+            return;
+        }
+        int id = Integer.parseInt(txtPaymentId.getText());
+
+        try {
+            Payment current = dao.getById(id);
+            if (current == null) {
+                warn("This payment no longer exists. Click REFRESH.");
+                return;
+            }
+            if (Constants.PAY_VOIDED.equals(current.getStatus())) {
+                warn("This payment is already voided.");
+                return;
+            }
+            int ok = JOptionPane.showConfirmDialog(this,
+                    "Void this payment? It stays in the records but no longer counts as collected money.",
+                    "Confirm Void", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (ok != JOptionPane.YES_OPTION) return;
+
+            dao.voidPayment(id);
+            JOptionPane.showMessageDialog(this, "Payment voided.");
+            clearForm();
+            refreshTable();
+            updateSummary();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnVoidActionPerformed
+
+    private void btnRefreshActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRefreshActionPerformed
+        txtSearch.setText("");
+        refreshTable();
+        updateSummary();
+    }//GEN-LAST:event_btnRefreshActionPerformed
 
     /**
      * @param args the command line arguments
