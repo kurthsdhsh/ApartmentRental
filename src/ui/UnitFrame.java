@@ -17,6 +17,9 @@ import javax.swing.table.DefaultTableModel;
 import model.Unit;
 import util.ErrorHelper;
 import util.Session;
+import java.math.BigDecimal;
+import util.Constants;
+import util.Validator;
 
 public class UnitFrame extends javax.swing.JFrame {
     
@@ -57,6 +60,71 @@ public class UnitFrame extends javax.swing.JFrame {
             u.getStatus()
         });
     }
+}
+    
+    private void warn(String message) {
+    JOptionPane.showMessageDialog(this, message, "Validation", JOptionPane.WARNING_MESSAGE);
+}
+
+private void showDbError(SQLException ex) {
+    if ("23505".equals(ex.getSQLState())) {
+        JOptionPane.showMessageDialog(this, "Unit number already exists.", "Duplicate", JOptionPane.ERROR_MESSAGE);
+    } else {
+        ErrorHelper.show(this, ex);
+    }
+}
+
+private void clearForm() {
+    txtUnitId.setText("");
+    txtUnitNo.setText("");
+    cmbUnitType.setSelectedIndex(0);
+    txtFloor.setText("");
+    txtRent.setText("");
+    cmbStatus.setSelectedIndex(0);
+    tblUnits.clearSelection();
+    txtUnitNo.requestFocus();
+}
+
+// validates the form
+private Unit readForm() {
+    String unitNo = txtUnitNo.getText().trim();
+    if (Validator.isEmpty(unitNo)) {
+        warn("Unit number is required.");
+        txtUnitNo.requestFocus();
+        return null;
+    }
+    if (unitNo.length() > 20) {
+        warn("Unit number must be 20 characters or less.");
+        return null;
+    }
+
+    int floor;
+    try {
+        floor = Integer.parseInt(txtFloor.getText().trim());
+        if (floor < 1) 
+            throw new NumberFormatException();
+    } catch (NumberFormatException ex) {
+        warn("Floor must be a whole number of 1 or more.");
+        txtFloor.requestFocus();
+        return null;
+    }
+
+    BigDecimal rent;
+    try {
+        rent = Validator.parsePositive(txtRent.getText());
+    } catch (NumberFormatException ex) {
+        warn("Rent must be a number greater than 0.");
+        txtRent.requestFocus();
+        return null;
+    }
+
+    Unit u = new Unit();
+    u.setUnitNo(unitNo);
+    u.setUnitType(cmbUnitType.getSelectedItem().toString());
+    u.setFloorNo(floor);
+    u.setMonthlyRent(rent);
+    u.setStatus(cmbStatus.getSelectedItem().toString());
+    return u;
 }
 
     /**
@@ -136,6 +204,7 @@ public class UnitFrame extends javax.swing.JFrame {
         btnUpdate.setText("UPDATE");
 
         btnClear.setText("CLEAR");
+        btnClear.addActionListener(this::btnClearActionPerformed);
 
         javax.swing.GroupLayout pnlButtonsLayout = new javax.swing.GroupLayout(pnlButtons);
         pnlButtons.setLayout(pnlButtonsLayout);
@@ -349,7 +418,23 @@ public class UnitFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_txtRentActionPerformed
 
     private void btnSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSaveActionPerformed
-        // TODO add your handling code here:
+        Unit u = readForm();
+        if (u == null) return;
+
+        // occupied is controlled by contracts only
+        if (Constants.UNIT_OCCUPIED.equals(u.getStatus())) {
+            warn("A unit becomes Occupied only when a contract is created. Choose Available or Maintenance.");
+            return;
+        }
+
+        try {
+            dao.add(u);
+            JOptionPane.showMessageDialog(this, "Unit saved successfully.");
+            clearForm();
+            refreshTable();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
     }//GEN-LAST:event_btnSaveActionPerformed
 
     private void scrlUnitsMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_scrlUnitsMouseClicked
@@ -366,6 +451,10 @@ public class UnitFrame extends javax.swing.JFrame {
         txtFloor.setText(tblUnits.getValueAt(r, 3).toString());
         txtRent.setText(tblUnits.getValueAt(r, 4).toString());
         cmbStatus.setSelectedItem(tblUnits.getValueAt(r, 5).toString());    }//GEN-LAST:event_tblUnitsMouseClicked
+
+    private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed
+        clearForm();
+    }//GEN-LAST:event_btnClearActionPerformed
 
     /**
      * @param args the command line arguments
