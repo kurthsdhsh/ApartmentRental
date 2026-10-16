@@ -19,6 +19,10 @@ import model.Payment;
 import model.User;
 import util.ErrorHelper;
 import util.Session;
+
+import java.time.format.DateTimeParseException;
+import util.Constants;
+import util.Validator;
 /**
  *
  * @author diana
@@ -140,6 +144,79 @@ private void clearForm() {
     loadActiveContracts();   
 }
 
+private void warn(String message) {
+    JOptionPane.showMessageDialog(this, message, "Validation", JOptionPane.WARNING_MESSAGE);
+}
+
+private void showDbError(SQLException ex) {
+    String msg = ex.getMessage();
+    if (ex.getSQLState() == null && msg != null && msg.startsWith("The contract is not active")) {
+        JOptionPane.showMessageDialog(this,
+                "This contract is no longer active, so it cannot receive payments.",
+                "Cannot Continue", JOptionPane.WARNING_MESSAGE);
+        loadActiveContracts();
+    } else {
+        ErrorHelper.show(this, ex);
+    }
+}
+
+//validates the form
+private Payment readForm() {
+    Object c = cmbContract.getSelectedItem();
+    if (!(c instanceof ComboItem)) {
+        warn("Select a contract. If the list is empty, create a contract first.");
+        return null;
+    }
+
+    String month = txtBillingMonth.getText().trim();
+    try {
+        YearMonth.parse(month);               
+    } catch (DateTimeParseException ex) {
+        warn("Billing month must use yyyy-MM, for example 2026-10.");
+        txtBillingMonth.requestFocus();
+        return null;
+    }
+
+    LocalDate date;
+    try {
+        date = Validator.parseDate(txtPaymentDate.getText());
+    } catch (DateTimeParseException ex) {
+        warn("Payment date must be valid and use yyyy-MM-dd, for example 2026-10-07.");
+        txtPaymentDate.requestFocus();
+        return null;
+    }
+
+    BigDecimal amount;
+    try {
+        amount = Validator.parsePositive(txtAmount.getText());
+    } catch (NumberFormatException ex) {
+        warn("Amount must be a number greater than 0.");
+        txtAmount.requestFocus();
+        return null;
+    }
+
+    String status = cmbStatus.getSelectedItem().toString();
+    if (Constants.PAY_VOIDED.equals(status)) {
+        warn("To void a payment, use the VOID PAYMENT button.");
+        return null;
+    }
+
+    String remarks = txtRemarks.getText().trim();
+    if (remarks.length() > 255) {
+        warn("Remarks must be 255 characters or less.");
+        return null;
+    }
+
+    Payment p = new Payment();
+    p.setContractId(((ComboItem) c).getId());
+    p.setBillingMonth(month);
+    p.setPaymentDate(date);
+    p.setAmount(amount);
+    p.setPaymentMethod(cmbMethod.getSelectedItem().toString());
+    p.setStatus(status);
+    p.setRemarks(remarks);
+    return p;
+}
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -221,6 +298,7 @@ private void clearForm() {
         lblRemarks.setText("Remarks");
 
         btnSave.setText("SAVE");
+        btnSave.addActionListener(this::btnSaveActionPerformed);
 
         btnUpdate.setText("UPDATE");
 
@@ -509,6 +587,38 @@ private void clearForm() {
             ErrorHelper.show(this, ex);
         }
     }//GEN-LAST:event_tblPaymentsMouseClicked
+
+    private void btnSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSaveActionPerformed
+        if (!txtPaymentId.getText().isEmpty()) {
+            warn("A payment is selected. Click CLEAR first to record a new payment.");
+            return;
+        }
+        User user = Session.getCurrentUser();
+        if (user == null) {
+            warn("You must be logged in to record a payment. Open this screen from the Dashboard.");
+            return;
+        }
+        Payment p = readForm();
+        if (p == null) return; 
+        p.setUserId(user.getUserId()); 
+
+        try {
+            // duplicate month payment warning
+            if (dao.existsPaid(p.getContractId(), p.getBillingMonth())) {
+                int ok = JOptionPane.showConfirmDialog(this,
+                        "A payment for this month already exists. Save anyway?",
+                        "Duplicate Month", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                if (ok != JOptionPane.YES_OPTION) return;
+            }
+            dao.add(p);
+            JOptionPane.showMessageDialog(this, "Payment saved successfully.");
+            clearForm();
+            refreshTable();
+            updateSummary();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnSaveActionPerformed
 
     /**
      * @param args the command line arguments
