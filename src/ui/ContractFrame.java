@@ -306,10 +306,13 @@ private Contract readForm() {
         btnSave.addActionListener(this::btnSaveActionPerformed);
 
         btnUpdate.setText("UPDATE");
+        btnUpdate.addActionListener(this::btnUpdateActionPerformed);
 
         btnEnd.setText("END CONTRACT");
+        btnEnd.addActionListener(this::btnEndActionPerformed);
 
         btnDelete.setText("DELETE");
+        btnDelete.addActionListener(this::btnDeleteActionPerformed);
 
         btnClear.setText("CLEAR");
         btnClear.addActionListener(this::btnClearActionPerformed);
@@ -346,7 +349,6 @@ private Contract readForm() {
 
         lblSearch.setText("Search:");
 
-        txtSearch.setEditable(false);
         txtSearch.addActionListener(this::txtSearchActionPerformed);
 
         lblFilter.setText("Status:");
@@ -355,8 +357,10 @@ private Contract readForm() {
         cmbFilterStatus.addActionListener(this::cmbFilterStatusActionPerformed);
 
         btnRefresh.setText("REFRESH");
+        btnRefresh.addActionListener(this::btnRefreshActionPerformed);
 
         btnSearch.setText("SEARCH");
+        btnSearch.addActionListener(this::btnSearchActionPerformed);
 
         tblContracts.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
@@ -620,6 +624,107 @@ private Contract readForm() {
             showDbError(ex);
         }
     }//GEN-LAST:event_btnSaveActionPerformed
+
+    private void btnUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnUpdateActionPerformed
+        if (txtContractId.getText().isEmpty()) {
+            warn("Select a contract from the table first.");
+            return;
+        }
+        if (!Constants.CONTRACT_ACTIVE.equals(cmbStatus.getSelectedItem().toString())) {
+            warn("Only Active contracts can be updated.");
+            return;
+        }
+        Contract k = readForm();
+        if (k == null) return;
+        k.setContractId(Integer.parseInt(txtContractId.getText()));
+
+        try {
+            if (dao.updateContract(k)) { 
+                JOptionPane.showMessageDialog(this, "Contract updated successfully.");
+                clearForm();
+                refreshTable();
+            } else {
+                warn("Nothing was updated. The contract may no longer be Active. Click REFRESH.");
+            }
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnUpdateActionPerformed
+
+    private void btnEndActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEndActionPerformed
+        if (txtContractId.getText().isEmpty()) {
+            warn("Select a contract from the table first.");
+            return;
+        }
+        if (!Constants.CONTRACT_ACTIVE.equals(cmbStatus.getSelectedItem().toString())) {
+            warn("This contract is already closed.");
+            return;
+        }
+
+        Object[] options = {"Ended", "Terminated", "Cancel"};
+        int choice = JOptionPane.showOptionDialog(this,
+                "Ended = the lease finished normally.\nTerminated = the lease was cut short.\n\nHow should this contract be closed?",
+                "End Contract", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
+                null, options, options[0]);
+        if (choice != 0 && choice != 1) return; // cancel or the dialog was closed
+
+        String newStatus = (choice == 0) ? Constants.CONTRACT_ENDED : Constants.CONTRACT_TERMINATED;
+        try {
+            dao.endContract(Integer.parseInt(txtContractId.getText()), newStatus); // contract closed + unit now avail
+            JOptionPane.showMessageDialog(this, "Contract " + newStatus.toLowerCase() + ". The unit is available again.");
+            clearForm();
+            refreshTable();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnEndActionPerformed
+
+    private void btnDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDeleteActionPerformed
+        if (txtContractId.getText().isEmpty()) {
+            warn("Select a contract from the table first.");
+            return;
+        }
+        int id = Integer.parseInt(txtContractId.getText());
+
+        int ok = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to delete this record?",
+                "Confirm Delete", JOptionPane.YES_NO_OPTION);
+        if (ok != JOptionPane.YES_OPTION) return;
+
+        try {
+            if (dao.countPayments(id) > 0) {
+                JOptionPane.showMessageDialog(this,
+                        "This contract has payments and cannot be deleted. End the contract instead.",
+                        "Cannot Delete", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            dao.delete(id);
+            JOptionPane.showMessageDialog(this, "Contract deleted.");
+            clearForm();
+            refreshTable();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnDeleteActionPerformed
+
+    private void btnSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSearchActionPerformed
+        try {
+            List<Contract> list = dao.search(txtSearch.getText(),
+                    cmbFilterStatus.getSelectedItem().toString());
+            fillTable(list);
+            if (list.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No records found.");
+            }
+        } catch (SQLException ex) {
+            ErrorHelper.show(this, ex);
+        }
+    }//GEN-LAST:event_btnSearchActionPerformed
+
+    private void btnRefreshActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRefreshActionPerformed
+        txtSearch.setText("");
+        cmbFilterStatus.setSelectedIndex(0);
+        refreshTable();
+    }//GEN-LAST:event_btnRefreshActionPerformed
 
     /**
      * @param args the command line arguments
