@@ -124,6 +124,20 @@ public class PaymentDAO {
             try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getBigDecimal(1); }
         }
     }
+    
+    /** Sum of non-voided payments already recorded for one contract and billing month.
+     *  excludePaymentId lets Update ignore the payment being edited (use 0 for a new payment). */
+    public BigDecimal paidSoFar(int contractId, String billingMonth, int excludePaymentId) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(amount), 0) FROM PAYMENTS "
+                   + "WHERE contract_id = ? AND billing_month = ? AND status <> 'Voided' AND payment_id <> ?";
+        try (Connection c = DatabaseConnection.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            ps.setString(2, billingMonth);
+            ps.setInt(3, excludePaymentId);
+            try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getBigDecimal(1); }
+        }
+    }
+
 
     private Payment map(ResultSet rs) throws SQLException {
         Payment p = new Payment();

@@ -23,6 +23,15 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import util.Constants;
 import util.Validator;
+
+import java.time.YearMonth;
+
+import java.awt.Color;
+import java.awt.Component;
+import javax.swing.JTable;
+import javax.swing.table.DefaultTableCellRenderer;
+
+import java.time.temporal.ChronoUnit;
 /**
  *
  * @author diana
@@ -35,9 +44,11 @@ public class ContractFrame extends javax.swing.JFrame {
     private final TenantDAO tenantDao = new TenantDAO();
     private final UnitDAO unitDao = new UnitDAO();
     private boolean loading = false; 
+    private static final int DEPOSIT_MONTHS = 2;
 
     public ContractFrame() {
         initComponents();
+        installRowColors();
         setLocationRelativeTo(null);
         txtContractId.setEditable(false);         
         btnDelete.setEnabled(Session.isAdmin());  
@@ -93,13 +104,43 @@ private void fillRentFromSelectedUnit() {
     Object sel = cmbUnit.getSelectedItem();
     if (!(sel instanceof ComboItem)) {
         txtRent.setText("");
+        txtDeposit.setText("");
         return;
     }
     try {
         Unit u = unitDao.getById(((ComboItem) sel).getId());
-        if (u != null) txtRent.setText(u.getMonthlyRent().toPlainString());
+        if (u != null) {
+            txtRent.setText(u.getMonthlyRent().toPlainString());
+            fillDepositFromRent();
+        }
     } catch (SQLException ex) {
         ErrorHelper.show(this, ex);
+    }
+}
+
+private void fillDepositFromRent() {
+    try {
+        BigDecimal rent = Validator.parsePositive(txtRent.getText());
+        txtDeposit.setText(rent.multiply(BigDecimal.valueOf(DEPOSIT_MONTHS)).toPlainString());
+    } catch (NumberFormatException ex) {
+        txtDeposit.setText("");   
+    }
+}
+
+private void updateLength() {
+    try {
+        LocalDate s = Validator.parseDate(txtStartDate.getText());
+        LocalDate e = Validator.parseDate(txtEndDate.getText());
+        long months = ChronoUnit.MONTHS.between(s, e.plusDays(1)); 
+        if (months < 1) {
+            lblLength.setText("Contract length: less than 1 month");
+            return;
+        }
+        BigDecimal rent = Validator.parsePositive(txtRent.getText());
+        lblLength.setText(String.format("Contract length: %d months | Total rent: PHP %,.2f",
+                months, rent.multiply(BigDecimal.valueOf(months))));
+    } catch (RuntimeException ex) {   // dates or rent not typed yet (or invalid)
+        lblLength.setText("Contract length: -");
     }
 }
 
@@ -128,6 +169,26 @@ private void fillTable(List<Contract> list) {
     }
 }
 
+private void installRowColors() {
+    tblContracts.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
+                boolean hasFocus, int row, int column) {
+            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (!isSelected) {
+                Object status = table.getValueAt(row, 7);   // Status column
+                Object end = table.getValueAt(row, 4);      // End Date column
+                boolean expired = Constants.CONTRACT_ACTIVE.equals(status)
+                        && end instanceof LocalDate
+                        && ((LocalDate) end).isBefore(LocalDate.now());
+                c.setBackground(expired ? new Color(255, 224, 224) : Color.WHITE);
+                c.setForeground(expired ? new Color(150, 30, 30) : Color.BLACK);
+            }
+            return c;
+        }
+    });
+}
+
 private void selectById(JComboBox combo, int id) {
     for (int i = 0; i < combo.getItemCount(); i++) {
         Object o = combo.getItemAt(i);
@@ -142,13 +203,14 @@ private void clearForm() {
     txtContractId.setText("");
     txtStartDate.setText("");
     txtEndDate.setText("");
-    txtDeposit.setText("0");
     cmbStatus.setSelectedItem("Active");
     cmbTenant.setEnabled(true);
     cmbUnit.setEnabled(true);
     txtStartDate.setEditable(true);
     tblContracts.clearSelection();
     loadAvailableUnits();
+    
+    updateLength();
 }
 
 private void warn(String message) {
@@ -188,6 +250,12 @@ private Contract readForm() {
     }
     if (!end.isAfter(start)) {
         warn("End date must be after the start date.");
+        txtEndDate.requestFocus();
+        return null;
+    }
+    
+    if (ChronoUnit.MONTHS.between(start, end.plusDays(1)) < 1) {
+        warn("A contract must run for at least 1 month.");
         txtEndDate.requestFocus();
         return null;
     }
@@ -264,11 +332,15 @@ private Contract readForm() {
         btnSearch = new javax.swing.JButton();
         scrlContracts = new javax.swing.JScrollPane();
         tblContracts = new javax.swing.JTable();
+        lblDeposit1 = new javax.swing.JLabel();
+        lblLegend = new javax.swing.JLabel();
+        lblLength = new javax.swing.JLabel();
+        lblEnd1 = new javax.swing.JLabel();
+        lblStart1 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Contract Management");
-        setPreferredSize(new java.awt.Dimension(1020, 720));
-        setSize(new java.awt.Dimension(0, 0));
+        setSize(new java.awt.Dimension(1000, 650));
 
         lblTitle.setFont(new java.awt.Font("Segoe UI", 1, 20)); // NOI18N
         lblTitle.setText("CONTRACT MANAGEMENT");
@@ -302,6 +374,24 @@ private Contract readForm() {
 
         cmbStatus.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Active", "Ended", "Terminated" }));
         cmbStatus.setEnabled(false);
+
+        txtStartDate.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                txtStartDateKeyReleased(evt);
+            }
+        });
+
+        txtEndDate.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                txtEndDateKeyReleased(evt);
+            }
+        });
+
+        txtRent.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                txtRentKeyReleased(evt);
+            }
+        });
 
         btnSave.setText("SAVE");
         btnSave.addActionListener(this::btnSaveActionPerformed);
@@ -425,6 +515,20 @@ private Contract readForm() {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
+        lblDeposit1.setText("(2 months rent)");
+
+        lblLegend.setFont(new java.awt.Font("Segoe UI", 3, 12)); // NOI18N
+        lblLegend.setText("Red rows: Active contracts past their end date. Click END CONTRACT to close them.");
+
+        lblLength.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblLength.setText("Contract length: -");
+
+        lblEnd1.setFont(new java.awt.Font("Segoe UI", 2, 10)); // NOI18N
+        lblEnd1.setText("YYYY-mm-dd");
+
+        lblStart1.setFont(new java.awt.Font("Segoe UI", 2, 10)); // NOI18N
+        lblStart1.setText("YYYY-mm-dd");
+
         javax.swing.GroupLayout pnlFormLayout = new javax.swing.GroupLayout(pnlForm);
         pnlForm.setLayout(pnlFormLayout);
         pnlFormLayout.setHorizontalGroup(
@@ -433,70 +537,68 @@ private Contract readForm() {
                 .addGap(45, 45, 45)
                 .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(pnlFormLayout.createSequentialGroup()
+                        .addComponent(lblStatus, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(33, 33, 33)
+                        .addComponent(cmbStatus, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addGroup(pnlFormLayout.createSequentialGroup()
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(lblContractId, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(lblTenant, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(lblUnit, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(33, 33, 33)
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(cmbUnit, 0, 166, Short.MAX_VALUE)
+                            .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                .addComponent(txtContractId)
+                                .addComponent(cmbTenant, javax.swing.GroupLayout.PREFERRED_SIZE, 124, javax.swing.GroupLayout.PREFERRED_SIZE)))))
+                .addGap(165, 165, 165)
+                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(pnlFormLayout.createSequentialGroup()
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addComponent(lblStatus, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(33, 33, 33)
-                                .addComponent(cmbStatus, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                            .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(lblContractId, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                    .addComponent(lblTenant, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                    .addComponent(lblUnit, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addGap(33, 33, 33)
-                                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(cmbUnit, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                    .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                        .addComponent(txtContractId)
-                                        .addComponent(cmbTenant, javax.swing.GroupLayout.PREFERRED_SIZE, 124, javax.swing.GroupLayout.PREFERRED_SIZE)))))
-                        .addGap(165, 165, 165)
-                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addComponent(lblDeposit, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(txtDeposit))
-                            .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addComponent(lblRent, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(txtRent))
-                            .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addComponent(lblEnd, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                                    .addComponent(lblEnd, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(lblEnd1, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(txtEndDate))
                             .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addComponent(lblStart, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                                    .addComponent(lblStart, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(lblStart1, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(txtStartDate)))
                         .addGap(120, 120, 120))
                     .addGroup(pnlFormLayout.createSequentialGroup()
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addGap(21, 21, 21)
-                                .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
+                                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addComponent(lblRent, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(lblDeposit, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addGroup(pnlFormLayout.createSequentialGroup()
+                                        .addComponent(lblDeposit1, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addGap(0, 43, Short.MAX_VALUE))
+                                    .addComponent(txtDeposit)
+                                    .addComponent(txtRent))
+                                .addGap(105, 105, 105))
+                            .addComponent(lblLength, javax.swing.GroupLayout.PREFERRED_SIZE, 345, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addContainerGap())))
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, pnlFormLayout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addGroup(pnlFormLayout.createSequentialGroup()
+                        .addGap(6, 6, 6)
+                        .addComponent(lblLegend, javax.swing.GroupLayout.PREFERRED_SIZE, 625, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addContainerGap())
         );
         pnlFormLayout.setVerticalGroup(
             pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(pnlFormLayout.createSequentialGroup()
                 .addGap(23, 23, 23)
                 .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(pnlFormLayout.createSequentialGroup()
-                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(lblStart)
-                            .addComponent(txtStartDate, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(lblEnd)
-                            .addComponent(txtEndDate, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(lblRent)
-                            .addComponent(txtRent, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(lblDeposit)
-                            .addComponent(txtDeposit, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
                     .addGroup(pnlFormLayout.createSequentialGroup()
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(lblContractId)
@@ -508,16 +610,43 @@ private Contract readForm() {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(lblUnit)
-                            .addComponent(cmbUnit, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                .addComponent(cmbUnit, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(lblEnd1))))
+                    .addGroup(pnlFormLayout.createSequentialGroup()
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(pnlFormLayout.createSequentialGroup()
+                                .addComponent(lblStart)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(lblStart1))
+                            .addComponent(txtStartDate, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(lblStatus)
-                            .addComponent(cmbStatus, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                .addGap(27, 27, 27)
+                            .addComponent(lblEnd)
+                            .addComponent(txtEndDate, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(lblStatus)
+                    .addComponent(cmbStatus, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addGroup(pnlFormLayout.createSequentialGroup()
+                        .addComponent(lblLength)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(lblRent)
+                            .addComponent(txtRent, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(lblDeposit)
+                            .addComponent(txtDeposit, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(lblDeposit1)))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 39, Short.MAX_VALUE)
                 .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(43, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(lblLegend)
+                .addContainerGap())
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -530,9 +659,9 @@ private Contract readForm() {
                         .addGap(337, 337, 337)
                         .addComponent(lblTitle))
                     .addGroup(layout.createSequentialGroup()
-                        .addGap(36, 36, 36)
-                        .addComponent(pnlForm, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
-                .addContainerGap(38, Short.MAX_VALUE))
+                        .addGap(48, 48, 48)
+                        .addComponent(pnlForm, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addContainerGap(32, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -540,39 +669,14 @@ private Contract readForm() {
                 .addGap(31, 31, 31)
                 .addComponent(lblTitle)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(pnlForm, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addContainerGap(239, Short.MAX_VALUE))
+                .addComponent(pnlForm, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(182, Short.MAX_VALUE))
         );
 
         pnlForm.getAccessibleContext().setAccessibleName("");
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
-
-    private void txtContractIdActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtContractIdActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_txtContractIdActionPerformed
-
-    private void cmbTenantActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbTenantActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_cmbTenantActionPerformed
-
-    private void txtSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtSearchActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_txtSearchActionPerformed
-
-    private void cmbFilterStatusActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbFilterStatusActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_cmbFilterStatusActionPerformed
-
-    private void cmbUnitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbUnitActionPerformed
-        if (loading || !cmbUnit.isEnabled()) return;
-        fillRentFromSelectedUnit();    
-    }//GEN-LAST:event_cmbUnitActionPerformed
-
-    private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed
-        clearForm();
-    }//GEN-LAST:event_btnClearActionPerformed
 
     private void tblContractsMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblContractsMouseClicked
         int r = tblContracts.getSelectedRow();
@@ -594,7 +698,7 @@ private Contract readForm() {
             addItem(cmbUnit, new ComboItem(k.getUnitId(), k.getUnitNo()));
             loading = false;
 
-            txtStartDate.setText(k.getStartDate().toString());  
+            txtStartDate.setText(k.getStartDate().toString());
             txtEndDate.setText(k.getEndDate().toString());
             txtRent.setText(k.getMonthlyRent().toPlainString());
             txtDeposit.setText(k.getDeposit().toPlainString());
@@ -603,28 +707,108 @@ private Contract readForm() {
             cmbTenant.setEnabled(false);
             cmbUnit.setEnabled(false);
             txtStartDate.setEditable(false);
+
+            updateLength();
         } catch (SQLException ex) {
             ErrorHelper.show(this, ex);
         }
     }//GEN-LAST:event_tblContractsMouseClicked
 
-    private void btnSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSaveActionPerformed
-        if (!txtContractId.getText().isEmpty()) {
-            warn("A contract is selected. Click CLEAR first to create a new contract.");
+    private void btnSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSearchActionPerformed
+        try {
+            List<Contract> list = dao.search(txtSearch.getText(),
+                cmbFilterStatus.getSelectedItem().toString());
+            fillTable(list);
+            if (list.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No records found.");
+            }
+        } catch (SQLException ex) {
+            ErrorHelper.show(this, ex);
+        }
+    }//GEN-LAST:event_btnSearchActionPerformed
+
+    private void btnRefreshActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRefreshActionPerformed
+        txtSearch.setText("");
+        cmbFilterStatus.setSelectedIndex(0);
+        refreshTable();
+
+        if (txtContractId.getText().isEmpty()) {   // only in "new contract" mode
+            Object t = cmbTenant.getSelectedItem();
+            Object u = cmbUnit.getSelectedItem();
+            loadTenants();
+            loadAvailableUnits();
+            if (t instanceof ComboItem) selectById(cmbTenant, ((ComboItem) t).getId());
+            if (u instanceof ComboItem) selectById(cmbUnit, ((ComboItem) u).getId());
+        }
+    }//GEN-LAST:event_btnRefreshActionPerformed
+
+    private void cmbFilterStatusActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbFilterStatusActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_cmbFilterStatusActionPerformed
+
+    private void txtSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtSearchActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_txtSearchActionPerformed
+
+    private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed
+        clearForm();
+    }//GEN-LAST:event_btnClearActionPerformed
+
+    private void btnDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDeleteActionPerformed
+        if (txtContractId.getText().isEmpty()) {
+            warn("Select a contract from the table first.");
             return;
         }
-        Contract k = readForm();
-        if (k == null) return; // validation failed
+        int id = Integer.parseInt(txtContractId.getText());
+
+        int ok = JOptionPane.showConfirmDialog(this,
+            "Are you sure you want to delete this record?",
+            "Confirm Delete", JOptionPane.YES_NO_OPTION);
+        if (ok != JOptionPane.YES_OPTION) return;
 
         try {
-            dao.createContract(k); // insert contract + unit becomes occpued, in one transaction
-            JOptionPane.showMessageDialog(this, "Contract created successfully.");
+            if (dao.countPayments(id) > 0) {
+                JOptionPane.showMessageDialog(this,
+                    "This contract has payments and cannot be deleted. End the contract instead.",
+                    "Cannot Delete", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            dao.delete(id);
+            JOptionPane.showMessageDialog(this, "Contract deleted.");
             clearForm();
             refreshTable();
         } catch (SQLException ex) {
             showDbError(ex);
         }
-    }//GEN-LAST:event_btnSaveActionPerformed
+    }//GEN-LAST:event_btnDeleteActionPerformed
+
+    private void btnEndActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEndActionPerformed
+        if (txtContractId.getText().isEmpty()) {
+            warn("Select a contract from the table first.");
+            return;
+        }
+        if (!Constants.CONTRACT_ACTIVE.equals(cmbStatus.getSelectedItem().toString())) {
+            warn("This contract is already closed.");
+            return;
+        }
+
+        Object[] options = {"Ended", "Terminated", "Cancel"};
+        int choice = JOptionPane.showOptionDialog(this,
+            "Ended = the lease finished normally.\nTerminated = the lease was cut short.\n\nHow should this contract be closed?",
+            "End Contract", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
+            null, options, options[0]);
+        if (choice != 0 && choice != 1) return; // cancel or the dialog was closed
+
+        String newStatus = (choice == 0) ? Constants.CONTRACT_ENDED : Constants.CONTRACT_TERMINATED;
+        try {
+            dao.endContract(Integer.parseInt(txtContractId.getText()), newStatus); // contract closed + unit now avail
+            JOptionPane.showMessageDialog(this, "Contract " + newStatus.toLowerCase() + ". The unit is available again.");
+            clearForm();
+            refreshTable();
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnEndActionPerformed
 
     private void btnUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnUpdateActionPerformed
         if (txtContractId.getText().isEmpty()) {
@@ -640,7 +824,7 @@ private Contract readForm() {
         k.setContractId(Integer.parseInt(txtContractId.getText()));
 
         try {
-            if (dao.updateContract(k)) { 
+            if (dao.updateContract(k)) {
                 JOptionPane.showMessageDialog(this, "Contract updated successfully.");
                 clearForm();
                 refreshTable();
@@ -652,80 +836,67 @@ private Contract readForm() {
         }
     }//GEN-LAST:event_btnUpdateActionPerformed
 
-    private void btnEndActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEndActionPerformed
-        if (txtContractId.getText().isEmpty()) {
-            warn("Select a contract from the table first.");
+    private void btnSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSaveActionPerformed
+        if (!txtContractId.getText().isEmpty()) {
+            warn("A contract is selected. Click CLEAR first to create a new contract.");
             return;
         }
-        if (!Constants.CONTRACT_ACTIVE.equals(cmbStatus.getSelectedItem().toString())) {
-            warn("This contract is already closed.");
-            return;
+        Contract k = readForm();
+        if (k == null) return; // validation failed
+
+        BigDecimal required = k.getMonthlyRent().multiply(BigDecimal.valueOf(DEPOSIT_MONTHS));
+        if (k.getDeposit().compareTo(required) != 0) {
+            warn(String.format("Policy: the security deposit must be %d months of rent (PHP %,.2f).",
+                DEPOSIT_MONTHS, required));
+        txtDeposit.requestFocus();
+        return;
         }
-
-        Object[] options = {"Ended", "Terminated", "Cancel"};
-        int choice = JOptionPane.showOptionDialog(this,
-                "Ended = the lease finished normally.\nTerminated = the lease was cut short.\n\nHow should this contract be closed?",
-                "End Contract", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-                null, options, options[0]);
-        if (choice != 0 && choice != 1) return; // cancel or the dialog was closed
-
-        String newStatus = (choice == 0) ? Constants.CONTRACT_ENDED : Constants.CONTRACT_TERMINATED;
-        try {
-            dao.endContract(Integer.parseInt(txtContractId.getText()), newStatus); // contract closed + unit now avail
-            JOptionPane.showMessageDialog(this, "Contract " + newStatus.toLowerCase() + ". The unit is available again.");
-            clearForm();
-            refreshTable();
-        } catch (SQLException ex) {
-            showDbError(ex);
-        }
-    }//GEN-LAST:event_btnEndActionPerformed
-
-    private void btnDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDeleteActionPerformed
-        if (txtContractId.getText().isEmpty()) {
-            warn("Select a contract from the table first.");
-            return;
-        }
-        int id = Integer.parseInt(txtContractId.getText());
-
-        int ok = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete this record?",
-                "Confirm Delete", JOptionPane.YES_NO_OPTION);
-        if (ok != JOptionPane.YES_OPTION) return;
 
         try {
-            if (dao.countPayments(id) > 0) {
-                JOptionPane.showMessageDialog(this,
-                        "This contract has payments and cannot be deleted. End the contract instead.",
-                        "Cannot Delete", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-            dao.delete(id);
-            JOptionPane.showMessageDialog(this, "Contract deleted.");
-            clearForm();
-            refreshTable();
-        } catch (SQLException ex) {
-            showDbError(ex);
-        }
-    }//GEN-LAST:event_btnDeleteActionPerformed
+            dao.createContract(k); // insert contract + unit becomes occpued, in one transaction
+            JOptionPane.showMessageDialog(this, String.format(
+                "Contract created successfully.\n\n"
+                + "Move-in amounts to collect:\n"
+                + "   Security deposit (%d months): PHP %,.2f\n"
+                + "   Advance rent (1 month, billing month %s): PHP %,.2f\n\n"
+                + "Record the advance in the Payments screen.",
+                DEPOSIT_MONTHS, k.getDeposit(),
+                YearMonth.from(k.getStartDate()), k.getMonthlyRent()));
 
-    private void btnSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSearchActionPerformed
-        try {
-            List<Contract> list = dao.search(txtSearch.getText(),
-                    cmbFilterStatus.getSelectedItem().toString());
-            fillTable(list);
-            if (list.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "No records found.");
-            }
-        } catch (SQLException ex) {
-            ErrorHelper.show(this, ex);
-        }
-    }//GEN-LAST:event_btnSearchActionPerformed
-
-    private void btnRefreshActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRefreshActionPerformed
-        txtSearch.setText("");
-        cmbFilterStatus.setSelectedIndex(0);
+        clearForm();
         refreshTable();
-    }//GEN-LAST:event_btnRefreshActionPerformed
+        } catch (SQLException ex) {
+            showDbError(ex);
+        }
+    }//GEN-LAST:event_btnSaveActionPerformed
+
+    private void txtRentKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtRentKeyReleased
+        if (txtContractId.getText().isEmpty()) {
+            fillDepositFromRent();
+        }
+        updateLength();
+    }//GEN-LAST:event_txtRentKeyReleased
+
+    private void txtEndDateKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtEndDateKeyReleased
+        updateLength();
+    }//GEN-LAST:event_txtEndDateKeyReleased
+
+    private void txtStartDateKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtStartDateKeyReleased
+        updateLength();
+    }//GEN-LAST:event_txtStartDateKeyReleased
+
+    private void cmbUnitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbUnitActionPerformed
+        if (loading || !cmbUnit.isEnabled()) return;
+        fillRentFromSelectedUnit();
+    }//GEN-LAST:event_cmbUnitActionPerformed
+
+    private void cmbTenantActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbTenantActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_cmbTenantActionPerformed
+
+    private void txtContractIdActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtContractIdActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_txtContractIdActionPerformed
 
     /**
      * @param args the command line arguments
@@ -767,11 +938,16 @@ private Contract readForm() {
     private javax.swing.JPanel jPanel1;
     private javax.swing.JLabel lblContractId;
     private javax.swing.JLabel lblDeposit;
+    private javax.swing.JLabel lblDeposit1;
     private javax.swing.JLabel lblEnd;
+    private javax.swing.JLabel lblEnd1;
     private javax.swing.JLabel lblFilter;
+    private javax.swing.JLabel lblLegend;
+    private javax.swing.JLabel lblLength;
     private javax.swing.JLabel lblRent;
     private javax.swing.JLabel lblSearch;
     private javax.swing.JLabel lblStart;
+    private javax.swing.JLabel lblStart1;
     private javax.swing.JLabel lblStatus;
     private javax.swing.JLabel lblTenant;
     private javax.swing.JLabel lblTitle;
