@@ -267,7 +267,8 @@ private Contract readForm() {
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Contract Management");
-        setSize(new java.awt.Dimension(1000, 650));
+        setPreferredSize(new java.awt.Dimension(1020, 720));
+        setSize(new java.awt.Dimension(0, 0));
 
         lblTitle.setFont(new java.awt.Font("Segoe UI", 1, 20)); // NOI18N
         lblTitle.setText("CONTRACT MANAGEMENT");
@@ -530,7 +531,7 @@ private Contract readForm() {
                         .addComponent(lblTitle))
                     .addGroup(layout.createSequentialGroup()
                         .addGap(36, 36, 36)
-                        .addComponent(pnlForm, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addComponent(pnlForm, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
                 .addContainerGap(38, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
@@ -539,7 +540,7 @@ private Contract readForm() {
                 .addGap(31, 31, 31)
                 .addComponent(lblTitle)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(pnlForm, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(pnlForm, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addContainerGap(239, Short.MAX_VALUE))
         );
 
