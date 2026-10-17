@@ -35,6 +35,7 @@ public class ContractFrame extends javax.swing.JFrame {
     private final TenantDAO tenantDao = new TenantDAO();
     private final UnitDAO unitDao = new UnitDAO();
     private boolean loading = false; 
+    private static final int DEPOSIT_MONTHS = 2;
 
     public ContractFrame() {
         initComponents();
@@ -93,13 +94,26 @@ private void fillRentFromSelectedUnit() {
     Object sel = cmbUnit.getSelectedItem();
     if (!(sel instanceof ComboItem)) {
         txtRent.setText("");
+        txtDeposit.setText("");
         return;
     }
     try {
         Unit u = unitDao.getById(((ComboItem) sel).getId());
-        if (u != null) txtRent.setText(u.getMonthlyRent().toPlainString());
+        if (u != null) {
+            txtRent.setText(u.getMonthlyRent().toPlainString());
+            fillDepositFromRent();
+        }
     } catch (SQLException ex) {
         ErrorHelper.show(this, ex);
+    }
+}
+
+private void fillDepositFromRent() {
+    try {
+        BigDecimal rent = Validator.parsePositive(txtRent.getText());
+        txtDeposit.setText(rent.multiply(BigDecimal.valueOf(DEPOSIT_MONTHS)).toPlainString());
+    } catch (NumberFormatException ex) {
+        txtDeposit.setText("");   
     }
 }
 
@@ -142,7 +156,6 @@ private void clearForm() {
     txtContractId.setText("");
     txtStartDate.setText("");
     txtEndDate.setText("");
-    txtDeposit.setText("0");
     cmbStatus.setSelectedItem("Active");
     cmbTenant.setEnabled(true);
     cmbUnit.setEnabled(true);
@@ -264,6 +277,7 @@ private Contract readForm() {
         btnSearch = new javax.swing.JButton();
         scrlContracts = new javax.swing.JScrollPane();
         tblContracts = new javax.swing.JTable();
+        lblDeposit1 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Contract Management");
@@ -301,6 +315,12 @@ private Contract readForm() {
 
         cmbStatus.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Active", "Ended", "Terminated" }));
         cmbStatus.setEnabled(false);
+
+        txtRent.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                txtRentKeyReleased(evt);
+            }
+        });
 
         btnSave.setText("SAVE");
         btnSave.addActionListener(this::btnSaveActionPerformed);
@@ -424,6 +444,8 @@ private Contract readForm() {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
+        lblDeposit1.setText("(2 months rent)");
+
         javax.swing.GroupLayout pnlFormLayout = new javax.swing.GroupLayout(pnlForm);
         pnlForm.setLayout(pnlFormLayout);
         pnlFormLayout.setHorizontalGroup(
@@ -451,29 +473,32 @@ private Contract readForm() {
                         .addGap(165, 165, 165)
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addComponent(lblDeposit, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(txtDeposit))
-                            .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addComponent(lblRent, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(txtRent))
-                            .addGroup(pnlFormLayout.createSequentialGroup()
                                 .addComponent(lblEnd, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(txtEndDate))
                             .addGroup(pnlFormLayout.createSequentialGroup()
                                 .addComponent(lblStart, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(txtStartDate)))
+                                .addComponent(txtStartDate))
+                            .addGroup(pnlFormLayout.createSequentialGroup()
+                                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addComponent(lblRent, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addComponent(lblDeposit, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addGroup(pnlFormLayout.createSequentialGroup()
+                                        .addComponent(lblDeposit1, javax.swing.GroupLayout.PREFERRED_SIZE, 95, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addGap(0, 0, Short.MAX_VALUE))
+                                    .addComponent(txtDeposit)
+                                    .addComponent(txtRent))))
                         .addGap(120, 120, 120))
                     .addGroup(pnlFormLayout.createSequentialGroup()
-                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addGap(21, 21, 21)
-                                .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
+                        .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addContainerGap(12, Short.MAX_VALUE))))
+            .addGroup(pnlFormLayout.createSequentialGroup()
+                .addGap(65, 65, 65)
+                .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
         );
         pnlFormLayout.setVerticalGroup(
             pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -512,9 +537,11 @@ private Contract readForm() {
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(lblStatus)
                             .addComponent(cmbStatus, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                .addGap(27, 27, 27)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(lblDeposit1)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
+                .addGap(11, 11, 11)
                 .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap(43, Short.MAX_VALUE))
         );
@@ -531,7 +558,7 @@ private Contract readForm() {
                     .addGroup(layout.createSequentialGroup()
                         .addGap(36, 36, 36)
                         .addComponent(pnlForm, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(38, Short.MAX_VALUE))
+                .addContainerGap(32, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -614,6 +641,14 @@ private Contract readForm() {
         }
         Contract k = readForm();
         if (k == null) return; // validation failed
+        
+        BigDecimal required = k.getMonthlyRent().multiply(BigDecimal.valueOf(DEPOSIT_MONTHS));
+        if (k.getDeposit().compareTo(required) != 0) {
+            warn(String.format("Policy: the security deposit must be %d months of rent (PHP %,.2f).",
+                    DEPOSIT_MONTHS, required));
+            txtDeposit.requestFocus();
+            return;
+        }
 
         try {
             dao.createContract(k); // insert contract + unit becomes occpued, in one transaction
@@ -726,6 +761,12 @@ private Contract readForm() {
         refreshTable();
     }//GEN-LAST:event_btnRefreshActionPerformed
 
+    private void txtRentKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtRentKeyReleased
+        if (txtContractId.getText().isEmpty()) {
+            fillDepositFromRent();
+    }
+    }//GEN-LAST:event_txtRentKeyReleased
+
     /**
      * @param args the command line arguments
      */
@@ -766,6 +807,7 @@ private Contract readForm() {
     private javax.swing.JPanel jPanel1;
     private javax.swing.JLabel lblContractId;
     private javax.swing.JLabel lblDeposit;
+    private javax.swing.JLabel lblDeposit1;
     private javax.swing.JLabel lblEnd;
     private javax.swing.JLabel lblFilter;
     private javax.swing.JLabel lblRent;
