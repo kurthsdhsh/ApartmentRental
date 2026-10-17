@@ -39,11 +39,12 @@ public class PaymentFrame extends javax.swing.JFrame {
         initComponents();
         setLocationRelativeTo(null);
         txtPaymentId.setEditable(false);       
-        btnDelete.setEnabled(Session.isAdmin());  
-        loadActiveContracts();
+        btnDelete.setEnabled(Session.isAdmin());
         resetDefaults();
+        loadActiveContracts();
         refreshTable();
         updateSummary();
+        refreshBalance();
     }
     
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -70,9 +71,10 @@ private void loadActiveContracts() {
         loading = false;
     }
     fillAmountFromSelectedContract();
+    refreshBalance();
 }
 
-//copies the selected contract's monthly rent
+// suggests the amount
 private void fillAmountFromSelectedContract() {
     Object sel = cmbContract.getSelectedItem();
     if (!(sel instanceof ComboItem)) {
@@ -81,7 +83,17 @@ private void fillAmountFromSelectedContract() {
     }
     try {
         Contract k = contractDao.getById(((ComboItem) sel).getId());
-        if (k != null) txtAmount.setText(k.getMonthlyRent().toPlainString());
+        if (k == null) return;
+
+        BigDecimal amount = k.getMonthlyRent();       
+        try {
+            YearMonth month = YearMonth.parse(txtBillingMonth.getText().trim());
+            BigDecimal balance = k.getMonthlyRent()
+                    .subtract(dao.paidSoFar(k.getContractId(), month.toString(), 0));
+            if (balance.signum() > 0) amount = balance; 
+        } catch (DateTimeParseException ex) {
+        }
+        txtAmount.setText(amount.toPlainString());
     } catch (SQLException ex) {
         ErrorHelper.show(this, ex);
     }
@@ -134,6 +146,36 @@ private void updateSummary() {
         lblSummary.setText(String.format("Total collected this month: PHP %,.2f", total));
     } catch (SQLException ex) {
         ErrorHelper.show(this, ex);
+    }
+}
+
+// shows how much of the chosen contract's rent is already paid 
+private void refreshBalance() {
+    Object sel = cmbContract.getSelectedItem();
+    if (!(sel instanceof ComboItem)) {
+        lblBalance.setText("Paid so far: - | Balance: -");
+        return;
+    }
+    YearMonth month;
+    try {
+        month = YearMonth.parse(txtBillingMonth.getText().trim());
+    } catch (DateTimeParseException ex) {
+        lblBalance.setText("Enter a billing month (yyyy-MM) to see the balance.");
+        return;
+    }
+    try {
+        Contract k = contractDao.getById(((ComboItem) sel).getId());
+        if (k == null) return;
+        BigDecimal rent = k.getMonthlyRent();
+        BigDecimal paid = dao.paidSoFar(k.getContractId(), month.toString(), 0); // 0 = count every payment
+        BigDecimal balance = rent.subtract(paid);
+        if (balance.signum() <= 0) {
+            lblBalance.setText(String.format("%s: fully paid (PHP %,.2f of PHP %,.2f)", month, paid, rent));
+        } else {
+            lblBalance.setText(String.format("%s | Paid so far: PHP %,.2f | Balance: PHP %,.2f", month, paid, balance));
+        }
+    } catch (SQLException ex) {
+        lblBalance.setText("Cannot load the balance right now.");
     }
 }
 
@@ -238,6 +280,35 @@ private Payment readForm() {
     p.setRemarks(remarks);
     return p;
 }
+
+// checks that the status matches the money. 
+    private boolean confirmStatusMatchesAmount(Payment p, int excludePaymentId) throws SQLException {
+        Contract k = contractDao.getById(p.getContractId());
+        if (k == null) return true;                    
+        BigDecimal rent = k.getMonthlyRent();
+        BigDecimal total = dao.paidSoFar(p.getContractId(), p.getBillingMonth(), excludePaymentId)
+                              .add(p.getAmount());
+        boolean markedPaid = Constants.PAY_PAID.equals(p.getStatus());
+
+        String suggestion = null, msg = null;
+        if (markedPaid && total.compareTo(rent) < 0) {
+            suggestion = Constants.PAY_PARTIAL;
+            msg = String.format("With this payment, the total for %s is PHP %,.2f, below the monthly rent of PHP %,.2f "
+                    + "(balance PHP %,.2f).\nMark it as Partial instead?",
+                    p.getBillingMonth(), total, rent, rent.subtract(total));
+        } else if (!markedPaid && total.compareTo(rent) >= 0) {
+            suggestion = Constants.PAY_PAID;
+            msg = String.format("With this payment, the total for %s is PHP %,.2f, which covers the monthly rent of PHP %,.2f.\n"
+                    + "Mark it as Paid instead?", p.getBillingMonth(), total, rent);
+        }
+        if (msg == null) return true;                  
+
+        int choice = JOptionPane.showConfirmDialog(this, msg, "Check Status",
+                JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+        if (choice == JOptionPane.CANCEL_OPTION || choice == JOptionPane.CLOSED_OPTION) return false;
+        if (choice == JOptionPane.YES_OPTION) p.setStatus(suggestion);   
+        return true;                                                    
+    }
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -273,6 +344,7 @@ private Payment readForm() {
         btnVoid = new javax.swing.JButton();
         btnDelete = new javax.swing.JButton();
         btnClear = new javax.swing.JButton();
+        lblBalance = new javax.swing.JLabel();
         jPanel2 = new javax.swing.JPanel();
         lblSearch = new javax.swing.JLabel();
         txtSearch = new javax.swing.JTextField();
@@ -299,6 +371,12 @@ private Payment readForm() {
         cmbContract.addActionListener(this::cmbContractActionPerformed);
 
         lblMonth.setText("Billing Month");
+
+        txtBillingMonth.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                txtBillingMonthKeyReleased(evt);
+            }
+        });
 
         lblPayDate.setText("Payment Date");
 
@@ -363,6 +441,9 @@ private Payment readForm() {
                 .addContainerGap(16, Short.MAX_VALUE))
         );
 
+        lblBalance.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblBalance.setText("Paid so far: - | Balance: -");
+
         javax.swing.GroupLayout pnlFormLayout = new javax.swing.GroupLayout(pnlForm);
         pnlForm.setLayout(pnlFormLayout);
         pnlFormLayout.setHorizontalGroup(
@@ -411,7 +492,9 @@ private Payment readForm() {
                     .addGroup(javax.swing.GroupLayout.Alignment.LEADING, pnlFormLayout.createSequentialGroup()
                         .addComponent(lblRemarks, javax.swing.GroupLayout.PREFERRED_SIZE, 74, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(18, 18, 18)
-                        .addComponent(txtRemarks)))
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(lblBalance, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(txtRemarks))))
                 .addGap(63, 63, 63))
         );
         pnlFormLayout.setVerticalGroup(
@@ -455,9 +538,10 @@ private Payment readForm() {
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(lblStatus)
                             .addComponent(cmbStatus, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                .addGap(28, 28, 28)
-                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(lblBalance, javax.swing.GroupLayout.PREFERRED_SIZE, 16, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
         );
 
         lblSearch.setText("Search:");
@@ -556,7 +640,7 @@ private Payment readForm() {
                 .addComponent(scrlPayments, javax.swing.GroupLayout.PREFERRED_SIZE, 269, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(lblSummary)
-                .addContainerGap(23, Short.MAX_VALUE))
+                .addContainerGap(17, Short.MAX_VALUE))
         );
 
         pack();
@@ -598,6 +682,7 @@ private Payment readForm() {
     private void cmbContractActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbContractActionPerformed
         if (loading || !cmbContract.isEnabled()) return;
         fillAmountFromSelectedContract();
+        refreshBalance();
     }//GEN-LAST:event_cmbContractActionPerformed
 
     private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed
@@ -633,6 +718,7 @@ private Payment readForm() {
             txtRemarks.setText(p.getRemarks() == null ? "" : p.getRemarks());
 
             cmbContract.setEnabled(false);
+            refreshBalance();
         } catch (SQLException ex) {
             ErrorHelper.show(this, ex);
         }
@@ -660,6 +746,9 @@ private Payment readForm() {
                         "Duplicate Month", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
                 if (ok != JOptionPane.YES_OPTION) return;
             }
+            
+            if (!confirmStatusMatchesAmount(p, 0)) return; 
+            
             dao.add(p);
             JOptionPane.showMessageDialog(this, "Payment saved successfully.");
             clearForm();
@@ -693,6 +782,9 @@ private Payment readForm() {
                 warn("A voided payment cannot be edited.");
                 return;
             }
+            
+            if (!confirmStatusMatchesAmount(p, p.getPaymentId())) return;  
+            
             dao.update(p);
             JOptionPane.showMessageDialog(this, "Payment updated successfully.");
             clearForm();
@@ -741,6 +833,13 @@ private Payment readForm() {
         updateSummary();
     }//GEN-LAST:event_btnRefreshActionPerformed
 
+    private void txtBillingMonthKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtBillingMonthKeyReleased
+        refreshBalance();
+        if (txtPaymentId.getText().isEmpty()) { 
+            fillAmountFromSelectedContract();
+}
+    }//GEN-LAST:event_txtBillingMonthKeyReleased
+
     /**
      * @param args the command line arguments
      */
@@ -781,6 +880,7 @@ private Payment readForm() {
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JLabel lblAmount;
+    private javax.swing.JLabel lblBalance;
     private javax.swing.JLabel lblContract;
     private javax.swing.JLabel lblMethod;
     private javax.swing.JLabel lblMonth;
