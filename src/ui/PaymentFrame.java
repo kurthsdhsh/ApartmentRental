@@ -169,13 +169,34 @@ private Payment readForm() {
     }
 
     String month = txtBillingMonth.getText().trim();
+    YearMonth billing;
     try {
-        YearMonth.parse(month);               
+        billing = YearMonth.parse(month);               
     } catch (DateTimeParseException ex) {
         warn("Billing month must use yyyy-MM, for example 2026-10.");
         txtBillingMonth.requestFocus();
         return null;
     }
+    
+    // the billing month must fall inside the contract period
+    try {
+        Contract k = contractDao.getById(((ComboItem) c).getId());
+        if (k == null) {
+            warn("This contract no longer exists. Click REFRESH.");
+            return null;
+        }
+        YearMonth first = YearMonth.from(k.getStartDate());
+        YearMonth last = YearMonth.from(k.getEndDate());
+        if (billing.isBefore(first) || billing.isAfter(last)) {
+            warn("Billing month must be within the contract period (" + first + " to " + last + ").");
+            txtBillingMonth.requestFocus();
+            return null;
+        }
+    } catch (SQLException ex) {
+        ErrorHelper.show(this, ex);
+        return null;
+    }
+
 
     LocalDate date;
     try {
@@ -466,12 +487,13 @@ private Payment readForm() {
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel2Layout.createSequentialGroup()
                 .addContainerGap(15, Short.MAX_VALUE)
-                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(lblSearch)
-                    .addComponent(txtSearch, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                         .addComponent(btnSearch)
-                        .addComponent(btnRefresh)))
+                        .addComponent(btnRefresh))
+                    .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(lblSearch)
+                        .addComponent(txtSearch, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addGap(10, 10, 10))
         );
 
