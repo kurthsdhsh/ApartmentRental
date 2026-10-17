@@ -167,6 +167,14 @@ private void refreshBalance() {
         Contract k = contractDao.getById(((ComboItem) sel).getId());
         if (k == null) return;
         BigDecimal rent = k.getMonthlyRent();
+        
+                if (contractDao.countPayments(k.getContractId()) == 0) {
+            lblBalance.setText(String.format(
+                    "No payments yet. Move-in advance: PHP %,.2f for billing month %s",
+                    rent, YearMonth.from(k.getStartDate())));
+            return;
+        }
+                
         BigDecimal paid = dao.paidSoFar(k.getContractId(), month.toString(), 0); // 0 = count every payment
         BigDecimal balance = rent.subtract(paid);
         if (balance.signum() <= 0) {

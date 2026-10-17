@@ -23,6 +23,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import util.Constants;
 import util.Validator;
+
+import java.time.YearMonth;
 /**
  *
  * @author diana
@@ -652,7 +654,15 @@ private Contract readForm() {
 
         try {
             dao.createContract(k); // insert contract + unit becomes occpued, in one transaction
-            JOptionPane.showMessageDialog(this, "Contract created successfully.");
+            JOptionPane.showMessageDialog(this, String.format(
+            "Contract created successfully.\n\n"
+          + "Move-in amounts to collect:\n"
+          + "   Security deposit (%d months): PHP %,.2f\n"
+          + "   Advance rent (1 month, billing month %s): PHP %,.2f\n\n"
+          + "Record the advance in the Payments screen.",
+            DEPOSIT_MONTHS, k.getDeposit(),
+            YearMonth.from(k.getStartDate()), k.getMonthlyRent()));
+    
             clearForm();
             refreshTable();
         } catch (SQLException ex) {
