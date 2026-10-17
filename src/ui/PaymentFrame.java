@@ -23,6 +23,11 @@ import util.Session;
 import java.time.format.DateTimeParseException;
 import util.Constants;
 import util.Validator;
+
+import java.awt.Color;
+import java.awt.Component;
+import javax.swing.JTable;
+import javax.swing.table.DefaultTableCellRenderer;
 /**
  *
  * @author diana
@@ -37,6 +42,7 @@ public class PaymentFrame extends javax.swing.JFrame {
 
     public PaymentFrame() {
         initComponents();
+        installStatusColors();
         setLocationRelativeTo(null);
         txtPaymentId.setEditable(false);       
         btnDelete.setEnabled(Session.isAdmin());
@@ -138,6 +144,30 @@ private void fillTable(List<Payment> list) {
             p.getReceivedBy()
         });
     }
+}
+
+private void installStatusColors() {
+    tblPayments.getColumnModel().getColumn(7).setCellRenderer(new DefaultTableCellRenderer() {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
+                boolean hasFocus, int row, int column) {
+            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (!isSelected) {
+                String s = value == null ? "" : value.toString();
+                if (Constants.PAY_PAID.equals(s)) {
+                    c.setBackground(new Color(214, 240, 220));
+                    c.setForeground(new Color(20, 100, 50));
+                } else if (Constants.PAY_PARTIAL.equals(s)) {
+                    c.setBackground(new Color(255, 236, 200));
+                    c.setForeground(new Color(150, 90, 0));
+                } else {
+                    c.setBackground(Color.WHITE);
+                    c.setForeground(Color.BLACK);
+                }
+            }
+            return c;
+        }
+    });
 }
 
 private void updateSummary() {
@@ -839,6 +869,10 @@ private Payment readForm() {
         txtSearch.setText("");
         refreshTable();
         updateSummary();
+        if (txtPaymentId.getText().isEmpty()) {   
+            loadActiveContracts();               
+            refreshBalance();
+        }
     }//GEN-LAST:event_btnRefreshActionPerformed
 
     private void txtBillingMonthKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtBillingMonthKeyReleased

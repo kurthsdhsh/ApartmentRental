@@ -25,6 +25,11 @@ import util.Constants;
 import util.Validator;
 
 import java.time.YearMonth;
+
+import java.awt.Color;
+import java.awt.Component;
+import javax.swing.JTable;
+import javax.swing.table.DefaultTableCellRenderer;
 /**
  *
  * @author diana
@@ -41,6 +46,7 @@ public class ContractFrame extends javax.swing.JFrame {
 
     public ContractFrame() {
         initComponents();
+        installRowColors();
         setLocationRelativeTo(null);
         txtContractId.setEditable(false);         
         btnDelete.setEnabled(Session.isAdmin());  
@@ -142,6 +148,26 @@ private void fillTable(List<Contract> list) {
             k.getStatus()
         });
     }
+}
+
+private void installRowColors() {
+    tblContracts.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
+                boolean hasFocus, int row, int column) {
+            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (!isSelected) {
+                Object status = table.getValueAt(row, 7);   // Status column
+                Object end = table.getValueAt(row, 4);      // End Date column
+                boolean expired = Constants.CONTRACT_ACTIVE.equals(status)
+                        && end instanceof LocalDate
+                        && ((LocalDate) end).isBefore(LocalDate.now());
+                c.setBackground(expired ? new Color(255, 224, 224) : Color.WHITE);
+                c.setForeground(expired ? new Color(150, 30, 30) : Color.BLACK);
+            }
+            return c;
+        }
+    });
 }
 
 private void selectById(JComboBox combo, int id) {
@@ -280,6 +306,7 @@ private Contract readForm() {
         scrlContracts = new javax.swing.JScrollPane();
         tblContracts = new javax.swing.JTable();
         lblDeposit1 = new javax.swing.JLabel();
+        lblLegend = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Contract Management");
@@ -448,10 +475,17 @@ private Contract readForm() {
 
         lblDeposit1.setText("(2 months rent)");
 
+        lblLegend.setFont(new java.awt.Font("Segoe UI", 3, 12)); // NOI18N
+        lblLegend.setText("Red rows: Active contracts past their end date. Click END CONTRACT to close them.");
+
         javax.swing.GroupLayout pnlFormLayout = new javax.swing.GroupLayout(pnlForm);
         pnlForm.setLayout(pnlFormLayout);
         pnlFormLayout.setHorizontalGroup(
             pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(pnlFormLayout.createSequentialGroup()
+                .addGap(65, 65, 65)
+                .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
             .addGroup(pnlFormLayout.createSequentialGroup()
                 .addGap(45, 45, 45)
                 .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -495,12 +529,12 @@ private Contract readForm() {
                                     .addComponent(txtRent))))
                         .addGap(120, 120, 120))
                     .addGroup(pnlFormLayout.createSequentialGroup()
-                        .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addGroup(pnlFormLayout.createSequentialGroup()
+                                .addGap(6, 6, 6)
+                                .addComponent(lblLegend, javax.swing.GroupLayout.PREFERRED_SIZE, 625, javax.swing.GroupLayout.PREFERRED_SIZE)))
                         .addContainerGap(12, Short.MAX_VALUE))))
-            .addGroup(pnlFormLayout.createSequentialGroup()
-                .addGap(65, 65, 65)
-                .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, Short.MAX_VALUE))
         );
         pnlFormLayout.setVerticalGroup(
             pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -545,7 +579,9 @@ private Contract readForm() {
                 .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(11, 11, 11)
                 .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(43, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(lblLegend)
+                .addContainerGap(21, Short.MAX_VALUE))
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -769,6 +805,15 @@ private Contract readForm() {
         txtSearch.setText("");
         cmbFilterStatus.setSelectedIndex(0);
         refreshTable();
+
+        if (txtContractId.getText().isEmpty()) {   // only in "new contract" mode
+            Object t = cmbTenant.getSelectedItem();
+            Object u = cmbUnit.getSelectedItem();
+            loadTenants();                
+            loadAvailableUnits();               
+            if (t instanceof ComboItem) selectById(cmbTenant, ((ComboItem) t).getId());
+            if (u instanceof ComboItem) selectById(cmbUnit, ((ComboItem) u).getId());
+}
     }//GEN-LAST:event_btnRefreshActionPerformed
 
     private void txtRentKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtRentKeyReleased
@@ -820,6 +865,7 @@ private Contract readForm() {
     private javax.swing.JLabel lblDeposit1;
     private javax.swing.JLabel lblEnd;
     private javax.swing.JLabel lblFilter;
+    private javax.swing.JLabel lblLegend;
     private javax.swing.JLabel lblRent;
     private javax.swing.JLabel lblSearch;
     private javax.swing.JLabel lblStart;
