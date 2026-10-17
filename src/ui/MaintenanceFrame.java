@@ -1,183 +1,487 @@
 package ui;
-
+ 
 import dao.MaintenanceDAO;
-import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+import java.awt.Color;
+import java.awt.Component;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
-import javax.swing.*;
-import static javax.swing.WindowConstants.DISPOSE_ON_CLOSE;
+import javax.swing.JComboBox;
+import javax.swing.JOptionPane;
+import javax.swing.JTable;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import model.ComboItem;
 import model.MaintenanceRequest;
 import util.Constants;
 import util.ErrorHelper;
 import util.Session;
-import util.Style;
 import util.Validator;
+ 
+public class MaintenanceFrame extends javax.swing.JFrame {
 
-/** Maintenance requests: Add, View, Search, Update, Delete (Admin only), Clear. */
-public class MaintenanceFrame extends JFrame {
+    private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(MaintenanceFrame.class.getName());
 
     private final MaintenanceDAO dao = new MaintenanceDAO();
 
-    private final JTextField txtId = new JTextField(8);
-    private final JComboBox<ComboItem> cmbUnit = new JComboBox<>();
-    private final JComboBox<ComboItem> cmbTenant = new JComboBox<>();
-    private final JTextArea txtDescription = new JTextArea(3, 30);
-    private final JComboBox<String> cmbPriority =
-            new JComboBox<>(new String[]{"Low", "Medium", "High", "Urgent"});
-    private final JTextField txtDateReported = new JTextField(10);
-    private final JComboBox<String> cmbStatus = new JComboBox<>(new String[]{
-            Constants.MAINT_OPEN, Constants.MAINT_IN_PROGRESS, Constants.MAINT_RESOLVED, Constants.MAINT_CANCELLED});
-    private final JTextField txtDateResolved = new JTextField(10);
-    private final JTextField txtRepairCost = new JTextField(10);
-
-    private final JButton btnSave = new JButton("Save");
-    private final JButton btnUpdate = new JButton("Update");
-    private final JButton btnDelete = new JButton("Delete");
-    private final JButton btnClear = new JButton("Clear");
-
-    private final JTextField txtSearch = new JTextField(20);
-    private final JComboBox<String> cmbFilter = new JComboBox<>(new String[]{
-            "All", Constants.MAINT_OPEN, Constants.MAINT_IN_PROGRESS, Constants.MAINT_RESOLVED,
-            Constants.MAINT_CANCELLED});
-    private final JButton btnSearch = new JButton("Search");
-    private final JLabel lblInfo = new JLabel(" ");
-
-    private final DefaultTableModel tableModel = new DefaultTableModel(new String[]{
-            "ID", "Unit", "Tenant", "Description", "Priority", "Reported", "Status", "Resolved", "Cost"}, 0) {
-        @Override public boolean isCellEditable(int r, int c) { return false; }
-    };
-    private final JTable tblRequests = new JTable(tableModel);
-
     public MaintenanceFrame() {
-        setTitle("Maintenance Requests");
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);          // NEVER EXIT_ON_CLOSE
-        buildLayout();
-        setSize(1050, 720);
-        setLocationRelativeTo(null);
+        initComponents();
+        getContentPane().setBackground(new Color(249, 241, 246));
 
-        txtId.setEditable(false);
-        btnDelete.setEnabled(Session.isAdmin());              // role check
+        PillButtonUI.apply(btnSave, Theme.PRIMARY, Color.WHITE);
+        PillButtonUI.apply(btnUpdate, Theme.PRIMARY_DARK, Color.WHITE);
+        PillButtonUI.apply(btnDelete, Theme.DANGER, Color.WHITE);
+        PillButtonUI.apply(btnClear, new Color(160, 160, 160), Color.WHITE);
+        PillButtonUI.apply(btnSearch, Theme.PRIMARY, Color.WHITE);
+        PillButtonUI.apply(btnRefresh, Theme.PRIMARY_DARK, Color.WHITE);
+        PillButtonUI.apply(btnBack, Theme.SIDEBAR, Color.WHITE);
+        TableStyle.apply(tblContracts);
+        tblContracts.getColumnModel().getColumn(0).setMaxWidth(60);
+
+        installRowColors();
+        setLocationRelativeTo(null);
+        txtContractId.setEditable(false);          // auto-filled when a row is selected
+        btnDelete.setEnabled(Session.isAdmin());   // role check: Staff cannot delete
         loadCombos();
         clearForm();
         refreshTable();
-        wireEvents();
     }
 
-    // ------------------------------------------------------------ layout
-    private void buildLayout() {
-        JPanel root = new JPanel(new BorderLayout(8, 8));
-        root.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
-        root.setBackground(Style.BG);
 
-        JLabel title = new JLabel("Maintenance Requests");
-        title.setFont(Style.TITLE);
-        title.setForeground(Style.PRIMARY);
-        root.add(title, BorderLayout.NORTH);
 
-        // ---- form
-        JPanel form = new JPanel(new GridBagLayout());
-        form.setBackground(Style.BG);
-        form.setBorder(BorderFactory.createTitledBorder("Request details"));
-        txtDescription.setLineWrap(true);
-        txtDescription.setWrapStyleWord(true);
-        cmbUnit.setPreferredSize(new Dimension(180, 26));
-        cmbTenant.setPreferredSize(new Dimension(180, 26));
+    /**
+     * This method is called from within the constructor to initialize the form.
+     * WARNING: Do NOT modify this code. The content of this method is always
+     * regenerated by the Form Editor.
+     */
+    @SuppressWarnings("unchecked")
+    // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
+    private void initComponents() {
 
-        addRow(form, 0, 0, "ID", txtId);
-        addRow(form, 0, 2, "Priority", cmbPriority);
-        addRow(form, 1, 0, "Unit *", cmbUnit);
-        addRow(form, 1, 2, "Tenant", cmbTenant);
-        addRow(form, 2, 0, "Date reported (yyyy-MM-dd)", txtDateReported);
-        addRow(form, 2, 2, "Status", cmbStatus);
-        addRow(form, 3, 0, "Date resolved (yyyy-MM-dd)", txtDateResolved);
-        addRow(form, 3, 2, "Repair cost", txtRepairCost);
-        addRow(form, 4, 0, "Description * (max 500)", new JScrollPane(txtDescription));
+        lblTitle = new javax.swing.JLabel();
+        pnlForm = new javax.swing.JPanel();
+        lblRqsttId = new javax.swing.JLabel();
+        lblTenant = new javax.swing.JLabel();
+        lblUnit = new javax.swing.JLabel();
+        lblStatus = new javax.swing.JLabel();
+        lblReport = new javax.swing.JLabel();
+        lblResolve = new javax.swing.JLabel();
+        lblRepair = new javax.swing.JLabel();
+        lblDesc = new javax.swing.JLabel();
+        txtContractId = new javax.swing.JTextField();
+        cmbTenant = new javax.swing.JComboBox<>();
+        cmbUnit = new javax.swing.JComboBox<>();
+        cmbStatus = new javax.swing.JComboBox<>();
+        txtStartDate = new javax.swing.JTextField();
+        txtEndDate = new javax.swing.JTextField();
+        txtRent = new javax.swing.JTextField();
+        txtDescription = new javax.swing.JTextField();
+        lblDesc1 = new javax.swing.JLabel();
+        lblEnd1 = new javax.swing.JLabel();
+        lblStart1 = new javax.swing.JLabel();
+        lblStatus1 = new javax.swing.JLabel();
+        cmbStatus1 = new javax.swing.JComboBox<>();
+        btnSave = new javax.swing.JButton();
+        btnUpdate = new javax.swing.JButton();
+        btnDelete = new javax.swing.JButton();
+        btnClear = new javax.swing.JButton();
+        jPanel1 = new javax.swing.JPanel();
+        lblSearch = new javax.swing.JLabel();
+        txtSearch = new javax.swing.JTextField();
+        lblFilter = new javax.swing.JLabel();
+        cmbFilterStatus = new javax.swing.JComboBox<>();
+        btnRefresh = new javax.swing.JButton();
+        btnSearch = new javax.swing.JButton();
+        btnBack = new javax.swing.JButton();
+        scrlContracts = new javax.swing.JScrollPane();
+        tblContracts = new javax.swing.JTable();
+        lblLegend = new javax.swing.JLabel();
+        lblInfo = new javax.swing.JLabel();
 
-        GridBagConstraints gc = new GridBagConstraints();
-        gc.gridx = 4; gc.gridy = 0; gc.gridheight = 5; gc.insets = new Insets(4, 12, 4, 4);
-        JPanel buttons = new JPanel(new java.awt.GridLayout(4, 1, 0, 8));
-        buttons.setOpaque(false);
-        for (JButton b : new JButton[]{btnSave, btnUpdate, btnDelete, btnClear}) {
-            Style.styleButton(b);
-            buttons.add(b);
-        }
-        btnDelete.setBackground(Style.DANGER);
-        form.add(buttons, gc);
+        setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+        setTitle("Maintenance Management");
 
-        // ---- search + table
-        JPanel searchBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        searchBar.setOpaque(false);
-        searchBar.add(new JLabel("Search (unit, tenant, description):"));
-        searchBar.add(txtSearch);
-        searchBar.add(new JLabel("Status:"));
-        searchBar.add(cmbFilter);
-        Style.styleButton(btnSearch);
-        searchBar.add(btnSearch);
+        lblTitle.setFont(new java.awt.Font("Segoe UI", 1, 26)); // NOI18N
+        lblTitle.setForeground(new java.awt.Color(140, 40, 100));
+        lblTitle.setText("MAINTENANCE MANAGEMENT");
 
-        tblRequests.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        tblRequests.setRowHeight(24);
-        tblRequests.getColumnModel().getColumn(0).setPreferredWidth(40);
-        tblRequests.getColumnModel().getColumn(3).setPreferredWidth(260);
+        pnlForm.setBackground(new java.awt.Color(255, 255, 255));
+        pnlForm.setToolTipText("");
+        pnlForm.setName(""); // NOI18N
 
-        JPanel tablePanel = new JPanel(new BorderLayout(4, 4));
-        tablePanel.setOpaque(false);
-        tablePanel.add(searchBar, BorderLayout.NORTH);
-        tablePanel.add(new JScrollPane(tblRequests), BorderLayout.CENTER);
-        tablePanel.add(lblInfo, BorderLayout.SOUTH);
+        lblRqsttId.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblRqsttId.setForeground(new java.awt.Color(60, 40, 55));
+        lblRqsttId.setText("Request ID");
 
-        JPanel center = new JPanel(new BorderLayout(8, 8));
-        center.setOpaque(false);
-        center.add(form, BorderLayout.NORTH);
-        center.add(tablePanel, BorderLayout.CENTER);
-        root.add(center, BorderLayout.CENTER);
+        lblTenant.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblTenant.setForeground(new java.awt.Color(60, 40, 55));
+        lblTenant.setText("Tenant");
 
-        setContentPane(root);
-    }
+        lblUnit.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblUnit.setForeground(new java.awt.Color(60, 40, 55));
+        lblUnit.setText("Unit");
 
-    private void addRow(JPanel p, int row, int col, String label, java.awt.Component field) {
-        GridBagConstraints gc = new GridBagConstraints();
-        gc.insets = new Insets(4, 4, 4, 4);
-        gc.anchor = GridBagConstraints.WEST;
-        gc.gridx = col; gc.gridy = row;
-        JLabel l = new JLabel(label);
-        l.setFont(Style.LABEL);
-        p.add(l, gc);
-        gc.gridx = col + 1;
-        gc.fill = GridBagConstraints.HORIZONTAL;
-        gc.weightx = 1;
-        p.add(field, gc);
-    }
+        lblStatus.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblStatus.setForeground(new java.awt.Color(60, 40, 55));
+        lblStatus.setText("Priority");
 
-    private void wireEvents() {
-        btnSave.addActionListener(e -> save());
-        btnUpdate.addActionListener(e -> update());
-        btnDelete.addActionListener(e -> delete());
-        btnClear.addActionListener(e -> clearForm());
-        btnSearch.addActionListener(e -> search());
-        txtSearch.addActionListener(e -> search());          // Enter key searches too
-        tblRequests.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) loadSelectedRow();
+        lblReport.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblReport.setForeground(new java.awt.Color(60, 40, 55));
+        lblReport.setText("Date Reported");
+
+        lblResolve.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblResolve.setForeground(new java.awt.Color(60, 40, 55));
+        lblResolve.setText("Date Resolved");
+
+        lblRepair.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblRepair.setForeground(new java.awt.Color(60, 40, 55));
+        lblRepair.setText("Repair Cost");
+
+        lblDesc.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblDesc.setForeground(new java.awt.Color(60, 40, 55));
+        lblDesc.setText("Description");
+
+        txtContractId.setEditable(false);
+        txtContractId.setBackground(new java.awt.Color(243, 238, 241));
+        txtContractId.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        txtContractId.addActionListener(this::txtContractIdActionPerformed);
+
+        cmbTenant.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        cmbTenant.addActionListener(this::cmbTenantActionPerformed);
+
+        cmbUnit.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        cmbUnit.addActionListener(this::cmbUnitActionPerformed);
+
+        cmbStatus.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        cmbStatus.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Low", "Medium", "High", "Urgent" }));
+
+        txtStartDate.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        txtStartDate.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                txtStartDateKeyReleased(evt);
+            }
         });
+
+        txtEndDate.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        txtEndDate.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                txtEndDateKeyReleased(evt);
+            }
+        });
+
+        txtRent.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        txtRent.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                txtRentKeyReleased(evt);
+            }
+        });
+
+        txtDescription.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+
+        lblDesc1.setFont(new java.awt.Font("Segoe UI", 2, 10)); // NOI18N
+        lblDesc1.setForeground(new java.awt.Color(130, 110, 125));
+        lblDesc1.setText("(max 500 chars)");
+
+        lblEnd1.setFont(new java.awt.Font("Segoe UI", 2, 10)); // NOI18N
+        lblEnd1.setForeground(new java.awt.Color(130, 110, 125));
+        lblEnd1.setText("YYYY-mm-dd");
+
+        lblStart1.setFont(new java.awt.Font("Segoe UI", 2, 10)); // NOI18N
+        lblStart1.setForeground(new java.awt.Color(130, 110, 125));
+        lblStart1.setText("YYYY-mm-dd");
+
+        lblStatus1.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblStatus1.setForeground(new java.awt.Color(60, 40, 55));
+        lblStatus1.setText("Status");
+
+        cmbStatus1.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        cmbStatus1.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Open", "In Progress", "Resolved", "Cancelled" }));
+
+        btnSave.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnSave.setText("SAVE");
+        btnSave.addActionListener(this::btnSaveActionPerformed);
+
+        btnUpdate.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnUpdate.setText("UPDATE");
+        btnUpdate.addActionListener(this::btnUpdateActionPerformed);
+
+        btnDelete.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnDelete.setText("DELETE");
+        btnDelete.addActionListener(this::btnDeleteActionPerformed);
+
+        btnClear.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnClear.setText("CLEAR");
+        btnClear.addActionListener(this::btnClearActionPerformed);
+
+        javax.swing.GroupLayout pnlFormLayout = new javax.swing.GroupLayout(pnlForm);
+        pnlForm.setLayout(pnlFormLayout);
+        pnlFormLayout.setHorizontalGroup(
+            pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(pnlFormLayout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(lblRqsttId)
+                    .addComponent(lblTenant)
+                    .addComponent(lblUnit)
+                    .addComponent(lblStatus)
+                    .addComponent(lblStatus1))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(txtContractId)
+                    .addComponent(cmbTenant, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(cmbUnit, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(cmbStatus, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(cmbStatus1, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(28, 28, 28)
+                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(lblReport)
+                    .addComponent(lblStart1)
+                    .addComponent(lblResolve)
+                    .addComponent(lblEnd1)
+                    .addComponent(lblRepair)
+                    .addComponent(lblDesc)
+                    .addComponent(lblDesc1))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(txtStartDate)
+                    .addComponent(txtEndDate)
+                    .addComponent(txtRent)
+                    .addComponent(txtDescription))
+                .addGap(18, 18, 18)
+                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(btnSave, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(btnUpdate, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(btnDelete, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(btnClear, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap())
+        );
+        pnlFormLayout.setVerticalGroup(
+            pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(pnlFormLayout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(pnlFormLayout.createSequentialGroup()
+                        .addComponent(btnSave, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(10, 10, 10)
+                        .addComponent(btnUpdate, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(btnDelete, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(btnClear, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(pnlFormLayout.createSequentialGroup()
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(pnlFormLayout.createSequentialGroup()
+                                .addGap(5, 5, 5)
+                                .addComponent(lblReport)
+                                .addGap(0, 0, 0)
+                                .addComponent(lblStart1))
+                            .addComponent(txtStartDate, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(10, 10, 10)
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(pnlFormLayout.createSequentialGroup()
+                                .addGap(5, 5, 5)
+                                .addComponent(lblResolve)
+                                .addGap(0, 0, 0)
+                                .addComponent(lblEnd1))
+                            .addComponent(txtEndDate, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(10, 10, 10)
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(lblRepair)
+                            .addComponent(txtRent, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(pnlFormLayout.createSequentialGroup()
+                                .addGap(15, 15, 15)
+                                .addComponent(lblDesc)
+                                .addGap(0, 0, 0)
+                                .addComponent(lblDesc1))
+                            .addGroup(pnlFormLayout.createSequentialGroup()
+                                .addGap(10, 10, 10)
+                                .addComponent(txtDescription, javax.swing.GroupLayout.PREFERRED_SIZE, 93, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                    .addGroup(pnlFormLayout.createSequentialGroup()
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(lblRqsttId)
+                            .addComponent(txtContractId, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(10, 10, 10)
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(lblTenant)
+                            .addComponent(cmbTenant, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(10, 10, 10)
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(lblUnit)
+                            .addComponent(cmbUnit, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(10, 10, 10)
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(lblStatus)
+                            .addComponent(cmbStatus, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(cmbStatus1, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(lblStatus1))))
+                .addContainerGap(18, Short.MAX_VALUE))
+        );
+
+        jPanel1.setBackground(new java.awt.Color(255, 255, 255));
+
+        lblSearch.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblSearch.setForeground(new java.awt.Color(60, 40, 55));
+        lblSearch.setText("Search: (unit, tenant, issue):");
+
+        txtSearch.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        txtSearch.addActionListener(this::txtSearchActionPerformed);
+
+        lblFilter.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        lblFilter.setForeground(new java.awt.Color(60, 40, 55));
+        lblFilter.setText("Status:");
+
+        cmbFilterStatus.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        cmbFilterStatus.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "All", "Open", "In Progress", "Resolved", "Cancelled" }));
+        cmbFilterStatus.addActionListener(this::cmbFilterStatusActionPerformed);
+
+        btnRefresh.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnRefresh.setText("REFRESH");
+        btnRefresh.addActionListener(this::btnRefreshActionPerformed);
+
+        btnSearch.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnSearch.setText("SEARCH");
+        btnSearch.addActionListener(this::btnSearchActionPerformed);
+
+        btnBack.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
+        btnBack.setText("Back to Dashboard");
+        btnBack.addActionListener(this::btnBackActionPerformed);
+
+        javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
+        jPanel1.setLayout(jPanel1Layout);
+        jPanel1Layout.setHorizontalGroup(
+            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel1Layout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(lblSearch, javax.swing.GroupLayout.PREFERRED_SIZE, 199, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(txtSearch, javax.swing.GroupLayout.PREFERRED_SIZE, 167, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(lblFilter)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(cmbFilterStatus, javax.swing.GroupLayout.PREFERRED_SIZE, 195, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(btnSearch, javax.swing.GroupLayout.PREFERRED_SIZE, 110, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(btnRefresh, javax.swing.GroupLayout.PREFERRED_SIZE, 110, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(btnBack, javax.swing.GroupLayout.PREFERRED_SIZE, 164, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(77, 77, 77))
+        );
+        jPanel1Layout.setVerticalGroup(
+            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel1Layout.createSequentialGroup()
+                .addGap(10, 10, 10)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(lblSearch)
+                    .addComponent(txtSearch, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(lblFilter)
+                    .addComponent(cmbFilterStatus, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(btnSearch, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(btnRefresh, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(btnBack, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGap(10, 10, 10))
+        );
+
+        tblContracts.setModel(new javax.swing.table.DefaultTableModel(
+            new Object [][] {
+
+            },
+            new String [] {
+                "ID", "Unit", "Tenant", "Description", "Priority", "Reported", "Status", "Resolved", "Cost"
+            }
+        ) {
+            boolean[] canEdit = new boolean [] {
+                false, false, false, false, false, false, false, false, false
+            };
+
+            public boolean isCellEditable(int rowIndex, int columnIndex) {
+                return canEdit [columnIndex];
+            }
+        });
+        tblContracts.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+        tblContracts.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                tblContractsMouseClicked(evt);
+            }
+        });
+        scrlContracts.setViewportView(tblContracts);
+
+        lblLegend.setFont(new java.awt.Font("Segoe UI", 3, 12)); // NOI18N
+        lblLegend.setForeground(new java.awt.Color(130, 110, 125));
+        lblLegend.setText("Red rows: Urgent requests that are still Open or In Progress.");
+
+        lblInfo.setForeground(new java.awt.Color(130, 110, 125));
+        lblInfo.setText(" ");
+
+        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
+        getContentPane().setLayout(layout);
+        layout.setHorizontalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(layout.createSequentialGroup()
+                .addGap(24, 24, 24)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(lblLegend, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addGroup(layout.createSequentialGroup()
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(lblInfo, javax.swing.GroupLayout.PREFERRED_SIZE, 1055, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(lblTitle)
+                            .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                                .addComponent(jPanel1, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.PREFERRED_SIZE, 1038, Short.MAX_VALUE)
+                                .addComponent(pnlForm, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                            .addComponent(scrlContracts, javax.swing.GroupLayout.PREFERRED_SIZE, 1038, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(0, 0, Short.MAX_VALUE))))
+        );
+        layout.setVerticalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(layout.createSequentialGroup()
+                .addGap(20, 20, 20)
+                .addComponent(lblTitle)
+                .addGap(34, 34, 34)
+                .addComponent(pnlForm, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(scrlContracts, javax.swing.GroupLayout.PREFERRED_SIZE, 212, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(lblInfo)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(lblLegend)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        );
+
+        pnlForm.getAccessibleContext().setAccessibleName("");
+
+        pack();
+    }// </editor-fold>//GEN-END:initComponents
+@SuppressWarnings({"unchecked", "rawtypes"})
+    private static void addItem(JComboBox combo, ComboItem item) {
+        combo.addItem(item);
     }
 
-    // ------------------------------------------------------------ data loading
+    @SuppressWarnings("rawtypes")
+    private void selectById(JComboBox combo, int id) {
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            Object o = combo.getItemAt(i);
+            if (o instanceof ComboItem && ((ComboItem) o).getId() == id) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        }
+        if (combo.getItemCount() > 0) combo.setSelectedIndex(0);
+    }
+
     private void loadCombos() {
         try {
             cmbUnit.removeAllItems();
-            for (ComboItem i : dao.getUnitItems()) cmbUnit.addItem(i);
+            for (ComboItem i : dao.getUnitItems()) addItem(cmbUnit, i);
             cmbTenant.removeAllItems();
-            cmbTenant.addItem(new ComboItem(0, "-- None --"));
-            for (ComboItem i : dao.getTenantItems()) cmbTenant.addItem(i);
+            addItem(cmbTenant, new ComboItem(0, "-- None --"));     // id 0 is saved as NULL
+            for (ComboItem i : dao.getTenantItems()) addItem(cmbTenant, i);
         } catch (SQLException ex) {
             ErrorHelper.show(this, ex);
         }
@@ -186,148 +490,98 @@ public class MaintenanceFrame extends JFrame {
     private void refreshTable() {
         try {
             fillTable(dao.getAll());
-            lblInfo.setText(" ");
         } catch (SQLException ex) {
             ErrorHelper.show(this, ex);
         }
     }
 
     private void fillTable(List<MaintenanceRequest> list) {
-        tableModel.setRowCount(0);                            // clear old rows
+        DefaultTableModel m = (DefaultTableModel) tblContracts.getModel();
+        m.setRowCount(0);                                              // clear old rows
         for (MaintenanceRequest r : list) {
-            tableModel.addRow(new Object[]{
-                r.getRequestId(), r.getUnitNo(), r.getTenantName(), r.getDescription(), r.getPriority(),
-                r.getDateReported(), r.getStatus(),
+            m.addRow(new Object[]{
+                r.getRequestId(),
+                r.getUnitNo(),
+                r.getTenantName(),
+                r.getDescription(),
+                r.getPriority(),
+                r.getDateReported(),
+                r.getStatus(),
                 r.getDateResolved() == null ? "" : r.getDateResolved().toString(),
-                String.format("%,.2f", r.getRepairCost())});
+                String.format("%,.2f", r.getRepairCost())
+            });
         }
-        lblInfo.setText(list.isEmpty() ? "No records found." : list.size() + " record(s).");
+        lblInfo.setText(list.isEmpty() ? "No records found." : list.size() + " request(s)");
     }
 
-    /** Row click: load the full record from the DB into the form. */
-    private void loadSelectedRow() {
-        int row = tblRequests.getSelectedRow();
-        if (row < 0) return;
-        int id = (Integer) tableModel.getValueAt(row, 0);
-        try {
-            MaintenanceRequest r = dao.getById(id);
-            if (r == null) return;
-            txtId.setText(String.valueOf(r.getRequestId()));
-            selectCombo(cmbUnit, r.getUnitId());
-            selectCombo(cmbTenant, r.getTenantId());
-            txtDescription.setText(r.getDescription());
-            cmbPriority.setSelectedItem(r.getPriority());
-            txtDateReported.setText(r.getDateReported().toString());
-            cmbStatus.setSelectedItem(r.getStatus());
-            txtDateResolved.setText(r.getDateResolved() == null ? "" : r.getDateResolved().toString());
-            txtRepairCost.setText(r.getRepairCost().toPlainString());
-        } catch (SQLException ex) {
-            ErrorHelper.show(this, ex);
-        }
-    }
-
-    private void selectCombo(JComboBox<ComboItem> cmb, int id) {
-        for (int i = 0; i < cmb.getItemCount(); i++) {
-            if (cmb.getItemAt(i).getId() == id) { cmb.setSelectedIndex(i); return; }
-        }
-        if (cmb.getItemCount() > 0) cmb.setSelectedIndex(0);
-    }
-
-    // ------------------------------------------------------------ button actions
-    private void save() {
-        MaintenanceRequest r = readForm();
-        if (r == null) return;
-        try {
-            dao.add(r);
-            JOptionPane.showMessageDialog(this, "Maintenance request saved successfully.");
-            clearForm();
-            refreshTable();
-        } catch (SQLException ex) {
-            ErrorHelper.show(this, ex);
-        }
-    }
-
-    private void update() {
-        if (Validator.isEmpty(txtId.getText())) { warn("Select a record from the table first."); return; }
-        MaintenanceRequest r = readForm();
-        if (r == null) return;
-        r.setRequestId(Integer.parseInt(txtId.getText()));
-        try {
-            dao.update(r);
-            JOptionPane.showMessageDialog(this, "Maintenance request updated successfully.");
-            clearForm();
-            refreshTable();
-        } catch (SQLException ex) {
-            ErrorHelper.show(this, ex);
-        }
-    }
-
-    private void delete() {
-        if (!Session.isAdmin()) { warn("Only an Admin can delete records."); return; }
-        if (Validator.isEmpty(txtId.getText())) { warn("Select a record from the table first."); return; }
-        int ok = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this record?",
-                "Confirm Delete", JOptionPane.YES_NO_OPTION);
-        if (ok != JOptionPane.YES_OPTION) return;
-        try {
-            dao.delete(Integer.parseInt(txtId.getText()));
-            JOptionPane.showMessageDialog(this, "Record deleted.");
-            clearForm();
-            refreshTable();
-        } catch (SQLException ex) {
-            ErrorHelper.show(this, ex);
-        }
-    }
-
-    private void search() {
-        try {
-            fillTable(dao.search(txtSearch.getText(), (String) cmbFilter.getSelectedItem()));
-        } catch (SQLException ex) {
-            ErrorHelper.show(this, ex);
-        }
+    /** Urgent requests that are still open are shown in red, like overdue contracts. */
+    private void installRowColors() {
+        tblContracts.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
+                    boolean hasFocus, int row, int column) {
+                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                if (!isSelected) {
+                    Object priority = table.getValueAt(row, 4);        // Priority column
+                    Object status = table.getValueAt(row, 6);          // Status column
+                    boolean hot = "Urgent".equals(priority)
+                            && (Constants.MAINT_OPEN.equals(status) || Constants.MAINT_IN_PROGRESS.equals(status));
+                    c.setBackground(hot ? new Color(255, 224, 224) : Color.WHITE);
+                    c.setForeground(hot ? new Color(150, 30, 30) : Color.BLACK);
+                }
+                return c;
+            }
+        });
     }
 
     private void clearForm() {
-        tblRequests.clearSelection();
-        txtId.setText("");
+        tblContracts.clearSelection();
+        txtContractId.setText("");
         if (cmbUnit.getItemCount() > 0) cmbUnit.setSelectedIndex(0);
         if (cmbTenant.getItemCount() > 0) cmbTenant.setSelectedIndex(0);
         txtDescription.setText("");
-        cmbPriority.setSelectedItem("Medium");
-        txtDateReported.setText(LocalDate.now().toString());
-        cmbStatus.setSelectedItem(Constants.MAINT_OPEN);
-        txtDateResolved.setText("");
-        txtRepairCost.setText("0");
+        cmbStatus.setSelectedItem("Medium");                           // Priority
+        txtStartDate.setText(LocalDate.now().toString());
+        cmbStatus1.setSelectedItem(Constants.MAINT_OPEN);              // Status
+        txtEndDate.setText("");
+        txtRent.setText("0");
     }
 
-    // ------------------------------------------------------------ validation (returns null if invalid)
+    private void warn(String message) {
+        JOptionPane.showMessageDialog(this, message, "Validation", JOptionPane.WARNING_MESSAGE);
+    }
+
+    /** Validates the form. Returns null (after showing a message) when something is wrong. */
     private MaintenanceRequest readForm() {
-        ComboItem unit = (ComboItem) cmbUnit.getSelectedItem();
-        if (unit == null) { warn("Unit is required. Add a unit first."); return null; }
+        Object u = cmbUnit.getSelectedItem();
+        if (!(u instanceof ComboItem)) { warn("Unit is required. Add a unit first."); return null; }
 
         String desc = txtDescription.getText();
-        if (Validator.isEmpty(desc)) { warn("Description is required."); return null; }
+        if (Validator.isEmpty(desc)) { warn("Description is required."); txtDescription.requestFocus(); return null; }
         if (desc.trim().length() > 500) { warn("Description is too long (maximum 500 characters)."); return null; }
 
         LocalDate reported;
         try {
-            reported = Validator.parseDate(txtDateReported.getText());
+            reported = Validator.parseDate(txtStartDate.getText());
         } catch (DateTimeParseException ex) {
             warn("Date reported must be a valid date in yyyy-MM-dd format (example 2026-10-07).");
+            txtStartDate.requestFocus();
             return null;
         }
 
-        String status = (String) cmbStatus.getSelectedItem();
+        String status = cmbStatus1.getSelectedItem().toString();
         LocalDate resolved = null;
-        if (!Validator.isEmpty(txtDateResolved.getText())) {
+        if (!Validator.isEmpty(txtEndDate.getText())) {
             try {
-                resolved = Validator.parseDate(txtDateResolved.getText());
+                resolved = Validator.parseDate(txtEndDate.getText());
             } catch (DateTimeParseException ex) {
                 warn("Date resolved must be a valid date in yyyy-MM-dd format.");
+                txtEndDate.requestFocus();
                 return null;
             }
         } else if (Constants.MAINT_RESOLVED.equals(status)) {
-            resolved = LocalDate.now();                      // auto-fill today
-            txtDateResolved.setText(resolved.toString());
+            resolved = LocalDate.now();                                 // auto-fill today
+            txtEndDate.setText(resolved.toString());
         }
         if (resolved != null && resolved.isBefore(reported)) {
             warn("Date resolved cannot be before the date reported.");
@@ -335,22 +589,24 @@ public class MaintenanceFrame extends JFrame {
         }
 
         BigDecimal cost;
-        if (Validator.isEmpty(txtRepairCost.getText())) {
+        if (Validator.isEmpty(txtRent.getText())) {
             cost = BigDecimal.ZERO;
         } else {
             try {
-                cost = Validator.parseNonNegative(txtRepairCost.getText());
+                cost = Validator.parseNonNegative(txtRent.getText());
             } catch (NumberFormatException ex) {
                 warn("Repair cost must be a number, 0 or more.");
+                txtRent.requestFocus();
                 return null;
             }
         }
 
         MaintenanceRequest r = new MaintenanceRequest();
-        r.setUnitId(unit.getId());
-        r.setTenantId(((ComboItem) cmbTenant.getSelectedItem()).getId());   // 0 = none -> NULL in DAO
+        r.setUnitId(((ComboItem) u).getId());
+        Object t = cmbTenant.getSelectedItem();
+        r.setTenantId(t instanceof ComboItem ? ((ComboItem) t).getId() : 0);   // 0 = none -> NULL in the DAO
         r.setDescription(desc.trim());
-        r.setPriority((String) cmbPriority.getSelectedItem());
+        r.setPriority(cmbStatus.getSelectedItem().toString());                 // Priority combo
         r.setDateReported(reported);
         r.setStatus(status);
         r.setDateResolved(resolved);
@@ -358,7 +614,200 @@ public class MaintenanceFrame extends JFrame {
         return r;
     }
 
-    private void warn(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "Validation", JOptionPane.WARNING_MESSAGE);
+    private void tblContractsMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblContractsMouseClicked
+         int r = tblContracts.getSelectedRow();
+        if (r < 0) return;
+        try {
+            int id = Integer.parseInt(tblContracts.getValueAt(r, 0).toString());
+            MaintenanceRequest m = dao.getById(id);
+            if (m == null) {
+                JOptionPane.showMessageDialog(this, "This request no longer exists. Click REFRESH.");
+                return;
+            }
+            txtContractId.setText(String.valueOf(m.getRequestId()));
+            selectById(cmbUnit, m.getUnitId());
+            selectById(cmbTenant, m.getTenantId());
+            txtDescription.setText(m.getDescription());
+            cmbStatus.setSelectedItem(m.getPriority());          // Priority combo
+            txtStartDate.setText(m.getDateReported().toString());
+            cmbStatus1.setSelectedItem(m.getStatus());           // Status combo
+            txtEndDate.setText(m.getDateResolved() == null ? "" : m.getDateResolved().toString());
+            txtRent.setText(m.getRepairCost().toPlainString());
+        } catch (SQLException ex) {
+            ErrorHelper.show(this, ex);
+        }
+    }//GEN-LAST:event_tblContractsMouseClicked
+
+    private void btnSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSearchActionPerformed
+        try {
+            List<MaintenanceRequest> list = dao.search(txtSearch.getText(),
+                    cmbFilterStatus.getSelectedItem().toString());
+            fillTable(list);
+            if (list.isEmpty()) JOptionPane.showMessageDialog(this, "No records found.");
+        } catch (SQLException ex) {
+            ErrorHelper.show(this, ex);
+        }
+    }//GEN-LAST:event_btnSearchActionPerformed
+
+    private void btnRefreshActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnRefreshActionPerformed
+              txtSearch.setText("");
+        cmbFilterStatus.setSelectedIndex(0);
+        loadCombos();
+        refreshTable();
+    }//GEN-LAST:event_btnRefreshActionPerformed
+
+    private void cmbFilterStatusActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbFilterStatusActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_cmbFilterStatusActionPerformed
+
+    private void txtSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtSearchActionPerformed
+       btnSearchActionPerformed(evt); 
+    }//GEN-LAST:event_txtSearchActionPerformed
+
+    private void btnBackActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnBackActionPerformed
+        dispose();      // closes this window; the Dashboard comes back
+    }//GEN-LAST:event_btnBackActionPerformed
+
+    private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed
+        clearForm();
+    }//GEN-LAST:event_btnClearActionPerformed
+
+    private void btnDeleteActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDeleteActionPerformed
+        if (!Session.isAdmin()) { warn("Only an Admin can delete records."); return; }
+        if (txtContractId.getText().isEmpty()) { warn("Select a request from the table first."); return; }
+        int ok = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this record?",
+            "Confirm Delete", JOptionPane.YES_NO_OPTION);
+        if (ok != JOptionPane.YES_OPTION) return;
+        try {
+            dao.delete(Integer.parseInt(txtContractId.getText()));
+            JOptionPane.showMessageDialog(this, "Request deleted.");
+            clearForm();
+            refreshTable();
+        } catch (SQLException ex) {
+            ErrorHelper.show(this, ex);
+        }
+    }//GEN-LAST:event_btnDeleteActionPerformed
+
+    private void btnUpdateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnUpdateActionPerformed
+        if (txtContractId.getText().isEmpty()) { warn("Select a request from the table first."); return; }
+        MaintenanceRequest m = readForm();
+        if (m == null) return;
+        m.setRequestId(Integer.parseInt(txtContractId.getText()));
+        try {
+            dao.update(m);
+            JOptionPane.showMessageDialog(this, "Maintenance request updated successfully.");
+            clearForm();
+            refreshTable();
+        } catch (SQLException ex) {
+            ErrorHelper.show(this, ex);
+        }
+    }//GEN-LAST:event_btnUpdateActionPerformed
+
+    private void btnSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSaveActionPerformed
+        if (!txtContractId.getText().isEmpty()) {
+            warn("A request is selected. Click CLEAR first to add a new request.");
+            return;
+        }
+        MaintenanceRequest m = readForm();
+        if (m == null) return;                                          // validation failed
+        try {
+            dao.add(m);
+            JOptionPane.showMessageDialog(this, "Maintenance request saved successfully.");
+            clearForm();
+            refreshTable();
+        } catch (SQLException ex) {
+            ErrorHelper.show(this, ex);
+        }
+    }//GEN-LAST:event_btnSaveActionPerformed
+
+    private void txtRentKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtRentKeyReleased
+
+    }//GEN-LAST:event_txtRentKeyReleased
+
+    private void txtEndDateKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtEndDateKeyReleased
+
+    }//GEN-LAST:event_txtEndDateKeyReleased
+
+    private void txtStartDateKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtStartDateKeyReleased
+
+    }//GEN-LAST:event_txtStartDateKeyReleased
+
+    private void cmbUnitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbUnitActionPerformed
+
+    }//GEN-LAST:event_cmbUnitActionPerformed
+
+    private void cmbTenantActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbTenantActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_cmbTenantActionPerformed
+
+    private void txtContractIdActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtContractIdActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_txtContractIdActionPerformed
+
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String args[]) {
+        /* Set the Nimbus look and feel */
+        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
+        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
+         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
+         */
+        try {
+            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+                if ("Nimbus".equals(info.getName())) {
+                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
+                    break;
+                }
+            }
+        } catch (ReflectiveOperationException | javax.swing.UnsupportedLookAndFeelException ex) {
+            logger.log(java.util.logging.Level.SEVERE, null, ex);
+        }
+        //</editor-fold>
+
+        /* Create and display the form */
+        java.awt.EventQueue.invokeLater(() -> new MaintenanceFrame().setVisible(true));
     }
+
+    // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JButton btnBack;
+    private javax.swing.JButton btnClear;
+    private javax.swing.JButton btnDelete;
+    private javax.swing.JButton btnRefresh;
+    private javax.swing.JButton btnSave;
+    private javax.swing.JButton btnSearch;
+    private javax.swing.JButton btnUpdate;
+    private javax.swing.JComboBox<String> cmbFilterStatus;
+    private javax.swing.JComboBox<String> cmbStatus;
+    private javax.swing.JComboBox<String> cmbStatus1;
+    private javax.swing.JComboBox<String> cmbTenant;
+    private javax.swing.JComboBox<String> cmbUnit;
+    private javax.swing.JPanel jPanel1;
+    private javax.swing.JLabel lblDesc;
+    private javax.swing.JLabel lblDesc1;
+    private javax.swing.JLabel lblEnd1;
+    private javax.swing.JLabel lblFilter;
+    private javax.swing.JLabel lblInfo;
+    private javax.swing.JLabel lblLegend;
+    private javax.swing.JLabel lblRepair;
+    private javax.swing.JLabel lblReport;
+    private javax.swing.JLabel lblResolve;
+    private javax.swing.JLabel lblRqsttId;
+    private javax.swing.JLabel lblSearch;
+    private javax.swing.JLabel lblStart1;
+    private javax.swing.JLabel lblStatus;
+    private javax.swing.JLabel lblStatus1;
+    private javax.swing.JLabel lblTenant;
+    private javax.swing.JLabel lblTitle;
+    private javax.swing.JLabel lblUnit;
+    private javax.swing.JPanel pnlForm;
+    private javax.swing.JScrollPane scrlContracts;
+    private javax.swing.JTable tblContracts;
+    private javax.swing.JTextField txtContractId;
+    private javax.swing.JTextField txtDescription;
+    private javax.swing.JTextField txtEndDate;
+    private javax.swing.JTextField txtRent;
+    private javax.swing.JTextField txtSearch;
+    private javax.swing.JTextField txtStartDate;
+    // End of variables declaration//GEN-END:variables
 }
