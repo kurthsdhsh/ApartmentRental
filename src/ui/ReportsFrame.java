@@ -4,16 +4,15 @@ import dao.ReportDAO;
 import java.awt.Color;
 import java.sql.SQLException;
 import java.time.YearMonth;
-import java.time.format.DateTimeParseException;
-import javax.swing.JOptionPane;
+import javax.swing.DefaultComboBoxModel;
 import javax.swing.table.DefaultTableModel;
 import util.ErrorHelper;
-import util.Validator;
 
 
 public class ReportsFrame extends javax.swing.JFrame {
 
     private final ReportDAO dao = new ReportDAO();
+    private boolean loading = true;     
 
     private static final String[][] HEADERS = {
         {"Unit", "Type", "Monthly Rent (PHP)", "Status", "Current Tenant"},
@@ -28,33 +27,30 @@ public class ReportsFrame extends javax.swing.JFrame {
         initComponents();
         setLocationRelativeTo(null);
 
-        PillButtonUI.apply(btnGenerate, Theme.PRIMARY, Color.WHITE);
         PillButtonUI.apply(btnBack, Theme.SIDEBAR, Color.WHITE);
         TableStyle.apply(tblReport);
 
-        txtMonth.setText(YearMonth.now().toString());     
-        txtMonth.setEnabled(false);                       
-        generate();                                      
+        String[] months = new String[12];
+        YearMonth ym = YearMonth.now();
+        for (int i = 0; i < 12; i++) {
+            months[i] = ym.minusMonths(i).toString();
+        }
+        cmbMonth.setModel(new DefaultComboBoxModel<>(months));
+        showMonthBox(false);                  
+
+        loading = false;
+        generate();                           
     }
 
-    
+    private void showMonthBox(boolean show) {
+        lblMonth.setVisible(show);
+        cmbMonth.setVisible(show);
+    }
+
     private void generate() {
+        if (loading) return;
         int which = cmbReport.getSelectedIndex();
-        String month = txtMonth.getText().trim();
-        if (which == 3) {                                 
-            if (Validator.isEmpty(month)) {
-                warn("Please enter the billing month (example 2026-10).");
-                txtMonth.requestFocus();
-                return;
-            }
-            try {
-                month = YearMonth.parse(month).toString();
-            } catch (DateTimeParseException ex) {
-                warn("Billing month must look like yyyy-MM, for example 2026-10.");
-                txtMonth.requestFocus();
-                return;
-            }
-        }
+        String month = (String) cmbMonth.getSelectedItem();
         try {
             DefaultTableModel model = runReport(which, month);
             if (model.getColumnCount() == HEADERS[which].length) {
@@ -63,7 +59,8 @@ public class ReportsFrame extends javax.swing.JFrame {
             tblReport.setModel(model);
             TableStyle.apply(tblReport);                   
             int n = model.getRowCount();
-            lblInfo.setText(cmbReport.getSelectedItem() + ": " + (n == 0 ? "no records found." : n + " record(s)"));
+            String title = (which == 3) ? "Overdue rent for " + month : String.valueOf(cmbReport.getSelectedItem());
+            lblInfo.setText(title + ": " + (n == 0 ? "no records found." : n + " record(s)"));
         } catch (SQLException ex) {
             ErrorHelper.show(this, ex);
         }
@@ -80,10 +77,6 @@ public class ReportsFrame extends javax.swing.JFrame {
         }
     }
 
-    private void warn(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "Validation", JOptionPane.WARNING_MESSAGE);
-    }
-
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
@@ -93,9 +86,9 @@ public class ReportsFrame extends javax.swing.JFrame {
         lblReport = new javax.swing.JLabel();
         cmbReport = new javax.swing.JComboBox<>();
         lblMonth = new javax.swing.JLabel();
-        txtMonth = new javax.swing.JTextField();
-        btnGenerate = new javax.swing.JButton();
+        cmbMonth = new javax.swing.JComboBox<>();
         btnBack = new javax.swing.JButton();
+        lblHint = new javax.swing.JLabel();
         scrlReport = new javax.swing.JScrollPane();
         tblReport = new javax.swing.JTable();
         lblInfo = new javax.swing.JLabel();
@@ -122,18 +115,18 @@ public class ReportsFrame extends javax.swing.JFrame {
 
         lblMonth.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         lblMonth.setForeground(new java.awt.Color(60, 40, 55));
-        lblMonth.setText("Billing month (yyyy-MM)");
+        lblMonth.setText("Billing month");
 
-        txtMonth.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        txtMonth.addActionListener(this::txtMonthActionPerformed);
-
-        btnGenerate.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
-        btnGenerate.setText("Generate");
-        btnGenerate.addActionListener(this::btnGenerateActionPerformed);
+        cmbMonth.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        cmbMonth.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "2026-10" }));
+        cmbMonth.addActionListener(this::cmbMonthActionPerformed);
 
         btnBack.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         btnBack.setText("Back to Dashboard");
         btnBack.addActionListener(this::btnBackActionPerformed);
+
+        lblHint.setForeground(new java.awt.Color(130, 110, 125));
+        lblHint.setText("Overdue rent lists active contracts that have no Paid payment for the chosen billing month.");
 
         javax.swing.GroupLayout pnlControlsLayout = new javax.swing.GroupLayout(pnlControls);
         pnlControls.setLayout(pnlControlsLayout);
@@ -141,18 +134,19 @@ public class ReportsFrame extends javax.swing.JFrame {
             pnlControlsLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(pnlControlsLayout.createSequentialGroup()
                 .addGap(16, 16, 16)
-                .addComponent(lblReport)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(cmbReport, javax.swing.GroupLayout.PREFERRED_SIZE, 250, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(24, 24, 24)
-                .addComponent(lblMonth)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(txtMonth, javax.swing.GroupLayout.PREFERRED_SIZE, 110, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(16, 16, 16)
-                .addComponent(btnGenerate, javax.swing.GroupLayout.PREFERRED_SIZE, 110, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(btnBack, javax.swing.GroupLayout.PREFERRED_SIZE, 170, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(16, 16, 16))
+                .addGroup(pnlControlsLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(pnlControlsLayout.createSequentialGroup()
+                        .addComponent(lblReport)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(cmbReport, javax.swing.GroupLayout.PREFERRED_SIZE, 250, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(24, 24, 24)
+                        .addComponent(lblMonth)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(cmbMonth, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(btnBack, javax.swing.GroupLayout.PREFERRED_SIZE, 170, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(16, 16, 16))
+                    .addComponent(lblHint)))
         );
         pnlControlsLayout.setVerticalGroup(
             pnlControlsLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -162,10 +156,11 @@ public class ReportsFrame extends javax.swing.JFrame {
                     .addComponent(lblReport)
                     .addComponent(cmbReport, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(lblMonth)
-                    .addComponent(txtMonth, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(btnGenerate, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(cmbMonth, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(btnBack, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(36, 36, 36))
+                .addGap(8, 8, 8)
+                .addComponent(lblHint)
+                .addGap(12, 12, 12))
         );
 
         tblReport.setModel(new javax.swing.table.DefaultTableModel(
@@ -232,26 +227,23 @@ public class ReportsFrame extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void cmbReportActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbReportActionPerformed
-        txtMonth.setEnabled(cmbReport.getSelectedIndex() == 3);   
+        showMonthBox(cmbReport.getSelectedIndex() == 3);   
         generate();
     }//GEN-LAST:event_cmbReportActionPerformed
 
-    private void txtMonthActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtMonthActionPerformed
-        generate();     
-    }//GEN-LAST:event_txtMonthActionPerformed
-
-    private void btnGenerateActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnGenerateActionPerformed
+    private void cmbMonthActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbMonthActionPerformed
         generate();
-    }//GEN-LAST:event_btnGenerateActionPerformed
+    }//GEN-LAST:event_cmbMonthActionPerformed
 
     private void btnBackActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnBackActionPerformed
-        dispose();      
+        dispose();     
     }//GEN-LAST:event_btnBackActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnBack;
-    private javax.swing.JButton btnGenerate;
+    private javax.swing.JComboBox<String> cmbMonth;
     private javax.swing.JComboBox<String> cmbReport;
+    private javax.swing.JLabel lblHint;
     private javax.swing.JLabel lblInfo;
     private javax.swing.JLabel lblMonth;
     private javax.swing.JLabel lblReport;
@@ -260,6 +252,5 @@ public class ReportsFrame extends javax.swing.JFrame {
     private javax.swing.JPanel pnlRoot;
     private javax.swing.JScrollPane scrlReport;
     private javax.swing.JTable tblReport;
-    private javax.swing.JTextField txtMonth;
     // End of variables declaration//GEN-END:variables
 }
