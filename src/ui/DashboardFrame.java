@@ -140,9 +140,9 @@ public class DashboardFrame extends javax.swing.JFrame {
 
         pnlSidebar.setBackground(new java.awt.Color(115, 28, 82));
 
-        lblBrand.setFont(new java.awt.Font("Segoe UI", 1, 26)); // NOI18N
+        lblBrand.setFont(new java.awt.Font("Segoe UI", 1, 24)); // NOI18N
         lblBrand.setForeground(new java.awt.Color(255, 255, 255));
-        lblBrand.setText("Apartment");
+        lblBrand.setText("Hotel de Pequilla");
 
         lblBrandSub.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         lblBrandSub.setForeground(new java.awt.Color(214, 150, 184));
@@ -608,7 +608,7 @@ public class DashboardFrame extends javax.swing.JFrame {
                 .addGap(20, 20, 20)
                 .addComponent(lblTable)
                 .addGap(8, 8, 8)
-                .addComponent(scrlUnits)
+                .addComponent(scrlUnits, javax.swing.GroupLayout.DEFAULT_SIZE, 365, Short.MAX_VALUE)
                 .addGap(24, 24, 24))
         );
 
