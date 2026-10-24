@@ -21,6 +21,7 @@ public class UnitFrame extends javax.swing.JFrame {
     
     public UnitFrame() {
     initComponents();
+    txtSearch.addActionListener(e -> btnSearch.doClick());
     setLocationRelativeTo(null);
 
     PillButtonUI.apply(btnSave, Theme.PRIMARY, Color.WHITE);
@@ -323,6 +324,7 @@ private Unit readForm() {
         lblSearch.setText("Search (unit no. or type):");
 
         txtSearch.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        txtSearch.addActionListener(this::txtSearchActionPerformed);
 
         lblFilter.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         lblFilter.setText("Status:");
@@ -596,6 +598,10 @@ private Unit readForm() {
     private void btnBackActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnBackActionPerformed
         dispose();      // closes this window; the Dashboard comes back
     }//GEN-LAST:event_btnBackActionPerformed
+
+    private void txtSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtSearchActionPerformed
+    btnSearch.doClick();
+    }//GEN-LAST:event_txtSearchActionPerformed
 
     /**
      * @param args the command line arguments

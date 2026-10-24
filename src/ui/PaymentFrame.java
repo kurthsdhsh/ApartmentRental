@@ -40,6 +40,7 @@ public class PaymentFrame extends javax.swing.JFrame {
 
     public PaymentFrame() {
         initComponents();
+        txtSearch.addActionListener(e -> btnSearch.doClick());
         getContentPane().setBackground(new Color(249, 241, 246));
 
         PillButtonUI.apply(btnSave, Theme.PRIMARY, Color.WHITE);
@@ -711,6 +712,7 @@ private Payment readForm() {
         lblSearch.setText("Search (tenant name, unit no. or billing month):");
 
         txtSearch.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        txtSearch.addActionListener(this::txtSearchActionPerformed);
 
         btnSearch.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         btnSearch.setText("SEARCH");
@@ -1013,6 +1015,10 @@ private Payment readForm() {
     private void btnBackActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnBackActionPerformed
         dispose();      // closes this window; the Dashboard comes back
     }//GEN-LAST:event_btnBackActionPerformed
+
+    private void txtSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtSearchActionPerformed
+    btnSearch.doClick();
+    }//GEN-LAST:event_txtSearchActionPerformed
 
     /**
      * @param args the command line arguments

@@ -40,6 +40,7 @@ public class ContractFrame extends javax.swing.JFrame {
 
     public ContractFrame() {
         initComponents();
+        txtSearch.addActionListener(e -> btnSearch.doClick());
         getContentPane().setBackground(new Color(249, 241, 246));
 
         PillButtonUI.apply(btnSave, Theme.PRIMARY, Color.WHITE);
@@ -762,7 +763,7 @@ private Contract readForm() {
     }//GEN-LAST:event_cmbFilterStatusActionPerformed
 
     private void txtSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtSearchActionPerformed
-        // TODO add your handling code here:
+    btnSearch.doClick();
     }//GEN-LAST:event_txtSearchActionPerformed
 
     private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed

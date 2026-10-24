@@ -437,6 +437,9 @@
                   <Font name="Segoe UI" size="13" style="0"/>
                 </Property>
               </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="txtSearchActionPerformed"/>
+              </Events>
             </Component>
             <Component class="javax.swing.JLabel" name="lblFilter">
               <Properties>
