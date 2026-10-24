@@ -10,15 +10,15 @@ public class ContractDAO {
     // JOIN of 3 tables
     private static final String BASE =
             "SELECT c.contract_id, c.tenant_id, c.unit_id, t.first_name || ' ' || t.last_name AS tenant, u.unit_no, "
-          + "c.start_date, c.end_date, c.monthly_rent, c.deposit, c.status "
+          + "c.start_date, c.end_date, c.monthly_rent, c.status "
           + "FROM CONTRACTS c "
           + "INNER JOIN TENANTS t ON c.tenant_id = t.tenant_id "
           + "INNER JOIN UNITS u ON c.unit_id = u.unit_id ";
 
     /** Inserts the contract AND sets the unit to Occupied in ONE transaction. */
     public boolean createContract(Contract k) throws SQLException {
-        String ins = "INSERT INTO CONTRACTS (tenant_id, unit_id, start_date, end_date, monthly_rent, deposit, status) "
-                + "VALUES (?, ?, ?, ?, ?, ?, 'Active')";
+        String ins = "INSERT INTO CONTRACTS (tenant_id, unit_id, start_date, end_date, monthly_rent, status) "
+                + "VALUES (?, ?, ?, ?, ?, 'Active')";
         String occ = "UPDATE UNITS SET status = 'Occupied' WHERE unit_id = ? AND status = 'Available'";
         try (Connection c = DatabaseConnection.getConnection()) {
             c.setAutoCommit(false);
@@ -28,7 +28,6 @@ public class ContractDAO {
                 p1.setDate(3, java.sql.Date.valueOf(k.getStartDate()));
                 p1.setDate(4, java.sql.Date.valueOf(k.getEndDate()));
                 p1.setBigDecimal(5, k.getMonthlyRent());
-                p1.setBigDecimal(6, k.getDeposit());
                 p1.executeUpdate();
                 p2.setInt(1, k.getUnitId());
                 if (p2.executeUpdate() == 0) throw new SQLException("This unit is no longer available.");
@@ -45,14 +44,13 @@ public class ContractDAO {
 
     public boolean add(Contract k) throws SQLException { return createContract(k); }
 
-    /** Only end date, deposit and monthly rent may change, and only on an Active contract. */
+    /** Only end date and monthly rent may change, and only on an Active contract. */
     public boolean updateContract(Contract k) throws SQLException {
-        String sql = "UPDATE CONTRACTS SET end_date=?, monthly_rent=?, deposit=? WHERE contract_id=? AND status='Active'";
+        String sql = "UPDATE CONTRACTS SET end_date=?, monthly_rent=? WHERE contract_id=? AND status='Active'";
         try (Connection c = DatabaseConnection.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setDate(1, java.sql.Date.valueOf(k.getEndDate()));
             ps.setBigDecimal(2, k.getMonthlyRent());
-            ps.setBigDecimal(3, k.getDeposit());
-            ps.setInt(4, k.getContractId());
+            ps.setInt(3, k.getContractId());
             return ps.executeUpdate() > 0;
         }
     }
@@ -182,7 +180,6 @@ public class ContractDAO {
         k.setStartDate(rs.getDate("start_date").toLocalDate());
         k.setEndDate(rs.getDate("end_date").toLocalDate());
         k.setMonthlyRent(rs.getBigDecimal("monthly_rent"));
-        k.setDeposit(rs.getBigDecimal("deposit"));
         k.setStatus(rs.getString("status"));
         return k;
     }

@@ -4,7 +4,9 @@ import database.DatabaseConnection;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import model.Payment;
 
 public class PaymentDAO {
@@ -138,6 +140,20 @@ public class PaymentDAO {
         }
     }
 
+
+    /** Non-voided money paid per billing month (yyyy-MM) for one contract. Months with no payment are not in the map. */
+    public Map<String, BigDecimal> paidByMonth(int contractId) throws SQLException {
+        String sql = "SELECT billing_month, COALESCE(SUM(amount), 0) FROM PAYMENTS "
+                   + "WHERE contract_id = ? AND status <> 'Voided' GROUP BY billing_month";
+        Map<String, BigDecimal> map = new HashMap<>();
+        try (Connection c = DatabaseConnection.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) map.put(rs.getString(1), rs.getBigDecimal(2));
+            }
+        }
+        return map;
+    }
 
     private Payment map(ResultSet rs) throws SQLException {
         Payment p = new Payment();

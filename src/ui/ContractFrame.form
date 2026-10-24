@@ -114,19 +114,14 @@
                       <Group type="102" alignment="0" attributes="0">
                           <Group type="103" groupAlignment="0" attributes="0">
                               <Component id="lblStart" alignment="0" min="-2" max="-2" attributes="0"/>
-                              <Component id="lblStart1" alignment="0" min="-2" max="-2" attributes="0"/>
                               <Component id="lblEnd" alignment="0" min="-2" max="-2" attributes="0"/>
-                              <Component id="lblEnd1" alignment="0" min="-2" max="-2" attributes="0"/>
                               <Component id="lblRent" alignment="0" min="-2" max="-2" attributes="0"/>
-                              <Component id="lblDeposit" alignment="0" min="-2" max="-2" attributes="0"/>
-                              <Component id="lblDeposit1" alignment="0" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="0" attributes="0">
                               <Component id="txtStartDate" alignment="0" pref="275" max="32767" attributes="0"/>
                               <Component id="txtEndDate" alignment="0" max="32767" attributes="0"/>
                               <Component id="txtRent" alignment="0" max="32767" attributes="0"/>
-                              <Component id="txtDeposit" alignment="0" max="32767" attributes="0"/>
                           </Group>
                       </Group>
                       <Component id="lblLength" alignment="0" min="-2" max="-2" attributes="0"/>
@@ -164,39 +159,19 @@
                           </Group>
                       </Group>
                       <Group type="102" alignment="0" attributes="0">
-                          <Group type="103" groupAlignment="0" attributes="0">
-                              <Group type="102" alignment="0" attributes="0">
-                                  <EmptySpace min="-2" pref="5" max="-2" attributes="0"/>
-                                  <Component id="lblStart" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
-                                  <Component id="lblStart1" min="-2" max="-2" attributes="0"/>
-                              </Group>
-                              <Component id="txtStartDate" alignment="0" min="-2" pref="32" max="-2" attributes="0"/>
+                          <Group type="103" groupAlignment="3" attributes="0">
+                              <Component id="lblStart" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="txtStartDate" alignment="3" min="-2" pref="32" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace min="-2" pref="10" max="-2" attributes="0"/>
-                          <Group type="103" groupAlignment="0" attributes="0">
-                              <Group type="102" alignment="0" attributes="0">
-                                  <EmptySpace min="-2" pref="5" max="-2" attributes="0"/>
-                                  <Component id="lblEnd" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
-                                  <Component id="lblEnd1" min="-2" max="-2" attributes="0"/>
-                              </Group>
-                              <Component id="txtEndDate" alignment="0" min="-2" pref="32" max="-2" attributes="0"/>
+                          <Group type="103" groupAlignment="3" attributes="0">
+                              <Component id="lblEnd" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="txtEndDate" alignment="3" min="-2" pref="32" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace min="-2" pref="10" max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="3" attributes="0">
                               <Component id="lblRent" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="txtRent" alignment="3" min="-2" pref="32" max="-2" attributes="0"/>
-                          </Group>
-                          <EmptySpace min="-2" pref="10" max="-2" attributes="0"/>
-                          <Group type="103" groupAlignment="0" attributes="0">
-                              <Group type="102" alignment="0" attributes="0">
-                                  <EmptySpace min="-2" pref="5" max="-2" attributes="0"/>
-                                  <Component id="lblDeposit" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
-                                  <Component id="lblDeposit1" min="-2" max="-2" attributes="0"/>
-                              </Group>
-                              <Component id="txtDeposit" alignment="0" min="-2" pref="32" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace min="-2" pref="10" max="-2" attributes="0"/>
                           <Component id="lblLength" min="-2" max="-2" attributes="0"/>
@@ -286,17 +261,6 @@
             <Property name="text" type="java.lang.String" value="Monthly Rent"/>
           </Properties>
         </Component>
-        <Component class="javax.swing.JLabel" name="lblDeposit">
-          <Properties>
-            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-              <Font name="Segoe UI" size="13" style="1"/>
-            </Property>
-            <Property name="foreground" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
-              <Color blue="37" green="28" red="3c" type="rgb"/>
-            </Property>
-            <Property name="text" type="java.lang.String" value="Deposit"/>
-          </Properties>
-        </Component>
         <Component class="javax.swing.JTextField" name="txtContractId">
           <Properties>
             <Property name="editable" type="boolean" value="false"/>
@@ -384,13 +348,6 @@
           <Events>
             <EventHandler event="keyReleased" listener="java.awt.event.KeyListener" parameters="java.awt.event.KeyEvent" handler="txtRentKeyReleased"/>
           </Events>
-        </Component>
-        <Component class="javax.swing.JTextField" name="txtDeposit">
-          <Properties>
-            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-              <Font name="Segoe UI" size="13" style="0"/>
-            </Property>
-          </Properties>
         </Component>
         <Container class="javax.swing.JPanel" name="pnlButtons">
           <Properties>
@@ -483,17 +440,6 @@
             </Component>
           </SubComponents>
         </Container>
-        <Component class="javax.swing.JLabel" name="lblDeposit1">
-          <Properties>
-            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-              <Font name="Segoe UI" size="10" style="2"/>
-            </Property>
-            <Property name="foreground" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
-              <Color blue="7d" green="6e" red="82" type="rgb"/>
-            </Property>
-            <Property name="text" type="java.lang.String" value="(2 months rent)"/>
-          </Properties>
-        </Component>
         <Component class="javax.swing.JLabel" name="lblLength">
           <Properties>
             <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
@@ -503,28 +449,6 @@
               <Color blue="37" green="28" red="3c" type="rgb"/>
             </Property>
             <Property name="text" type="java.lang.String" value="Contract length: -"/>
-          </Properties>
-        </Component>
-        <Component class="javax.swing.JLabel" name="lblEnd1">
-          <Properties>
-            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-              <Font name="Segoe UI" size="10" style="2"/>
-            </Property>
-            <Property name="foreground" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
-              <Color blue="7d" green="6e" red="82" type="rgb"/>
-            </Property>
-            <Property name="text" type="java.lang.String" value="YYYY-mm-dd"/>
-          </Properties>
-        </Component>
-        <Component class="javax.swing.JLabel" name="lblStart1">
-          <Properties>
-            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-              <Font name="Segoe UI" size="10" style="2"/>
-            </Property>
-            <Property name="foreground" type="java.awt.Color" editor="org.netbeans.beaninfo.editors.ColorEditor">
-              <Color blue="7d" green="6e" red="82" type="rgb"/>
-            </Property>
-            <Property name="text" type="java.lang.String" value="YYYY-mm-dd"/>
           </Properties>
         </Component>
       </SubComponents>
@@ -672,14 +596,13 @@
         <Component class="javax.swing.JTable" name="tblContracts">
           <Properties>
             <Property name="model" type="javax.swing.table.TableModel" editor="org.netbeans.modules.form.editors2.TableModelEditor">
-              <Table columnCount="8" rowCount="0">
+              <Table columnCount="7" rowCount="0">
                 <Column editable="false" title="ID" type="java.lang.Object"/>
                 <Column editable="false" title="Tenant" type="java.lang.Object"/>
                 <Column editable="false" title="Unit" type="java.lang.Object"/>
                 <Column editable="false" title="Start Date" type="java.lang.Object"/>
                 <Column editable="false" title="End Date" type="java.lang.Object"/>
                 <Column editable="false" title="Monthly Rent" type="java.lang.Object"/>
-                <Column editable="false" title="Deposit" type="java.lang.Object"/>
                 <Column editable="false" title="Status" type="java.lang.Object"/>
               </Table>
             </Property>
