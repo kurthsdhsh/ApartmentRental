@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/GUIForms/JFrame.java to edit this template
- */
 package ui;
 import dao.ContractDAO;
 import dao.TenantDAO;
@@ -32,10 +28,7 @@ import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
 
 import java.time.temporal.ChronoUnit;
-/**
- *
- * @author diana
- */
+
 public class ContractFrame extends javax.swing.JFrame {
     
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(ContractFrame.class.getName());
@@ -44,7 +37,6 @@ public class ContractFrame extends javax.swing.JFrame {
     private final TenantDAO tenantDao = new TenantDAO();
     private final UnitDAO unitDao = new UnitDAO();
     private boolean loading = false; 
-    private static final int DEPOSIT_MONTHS = 2;
 
     public ContractFrame() {
         initComponents();
@@ -62,6 +54,8 @@ public class ContractFrame extends javax.swing.JFrame {
         tblContracts.getColumnModel().getColumn(0).setMaxWidth(60);
 
         installRowColors();
+        DatePicker.attach(txtStartDate, null, this::onStartDatePicked);
+        DatePicker.attach(txtEndDate, this::minEndDate, this::updateLength);
         setLocationRelativeTo(null);
         txtContractId.setEditable(false);         
         btnDelete.setEnabled(Session.isAdmin());  
@@ -117,26 +111,15 @@ private void fillRentFromSelectedUnit() {
     Object sel = cmbUnit.getSelectedItem();
     if (!(sel instanceof ComboItem)) {
         txtRent.setText("");
-        txtDeposit.setText("");
         return;
     }
     try {
         Unit u = unitDao.getById(((ComboItem) sel).getId());
         if (u != null) {
             txtRent.setText(u.getMonthlyRent().toPlainString());
-            fillDepositFromRent();
         }
     } catch (SQLException ex) {
         ErrorHelper.show(this, ex);
-    }
-}
-
-private void fillDepositFromRent() {
-    try {
-        BigDecimal rent = Validator.parsePositive(txtRent.getText());
-        txtDeposit.setText(rent.multiply(BigDecimal.valueOf(DEPOSIT_MONTHS)).toPlainString());
-    } catch (NumberFormatException ex) {
-        txtDeposit.setText("");   
     }
 }
 
@@ -176,31 +159,58 @@ private void fillTable(List<Contract> list) {
             k.getStartDate(),
             k.getEndDate(),
             k.getMonthlyRent(),
-            k.getDeposit(),
             k.getStatus()
         });
     }
     lblInfo.setText(list.isEmpty() ? "No records found." : list.size() + " contract(s)");
 }
 
+
 private void installRowColors() {
-    tblContracts.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-        @Override
-        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
-                boolean hasFocus, int row, int column) {
-            Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            if (!isSelected) {
-                Object status = table.getValueAt(row, 7);   // Status column
-                Object end = table.getValueAt(row, 4);      // End Date column
-                boolean expired = Constants.CONTRACT_ACTIVE.equals(status)
-                        && end instanceof LocalDate
-                        && ((LocalDate) end).isBefore(LocalDate.now());
-                c.setBackground(expired ? new Color(255, 224, 224) : Color.WHITE);
-                c.setForeground(expired ? new Color(150, 30, 30) : Color.BLACK);
+    javax.swing.table.TableColumnModel cols = tblContracts.getColumnModel();
+    for (int i = 0; i < cols.getColumnCount(); i++) {
+        javax.swing.table.TableCellRenderer existing = cols.getColumn(i).getCellRenderer();
+        final javax.swing.table.TableCellRenderer base =
+                existing != null ? existing : tblContracts.getDefaultRenderer(Object.class);
+        cols.getColumn(i).setCellRenderer((table, value, isSelected, hasFocus, row, column) -> {
+            Component c = base.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (!isSelected && isExpired(table, row)) {
+                c.setBackground(new Color(255, 224, 224));
+                c.setForeground(new Color(150, 30, 30));
             }
             return c;
+        });
+    }
+}
+
+private boolean isExpired(JTable table, int row) {
+    Object status = table.getValueAt(row, 6);   // Status column
+    Object end = table.getValueAt(row, 4);      // End Date column
+    return Constants.CONTRACT_ACTIVE.equals(status)
+            && end instanceof LocalDate
+            && ((LocalDate) end).isBefore(LocalDate.now());
+}
+
+private LocalDate minEndDate() {
+    try {
+        return Validator.parseDate(txtStartDate.getText()).plusMonths(1).minusDays(1);
+    } catch (DateTimeParseException ex) {
+        return null;   // no start date picked yet
+    }
+}
+
+private void onStartDatePicked() {
+    LocalDate min = minEndDate();
+    if (min != null && !txtEndDate.getText().isEmpty()) {
+        try {
+            if (Validator.parseDate(txtEndDate.getText()).isBefore(min)) {
+                txtEndDate.setText("");
+            }
+        } catch (DateTimeParseException ex) {
+            txtEndDate.setText("");
         }
-    });
+    }
+    updateLength();
 }
 
 private void selectById(JComboBox combo, int id) {
@@ -220,7 +230,8 @@ private void clearForm() {
     cmbStatus.setSelectedItem("Active");
     cmbTenant.setEnabled(true);
     cmbUnit.setEnabled(true);
-    txtStartDate.setEditable(true);
+    txtStartDate.setEnabled(true);
+    txtEndDate.setEnabled(true);
     tblContracts.clearSelection();
     loadAvailableUnits();
     
@@ -254,12 +265,20 @@ private Contract readForm() {
         return null;
     }
 
+    if (Validator.isEmpty(txtStartDate.getText())) {
+        warn("Select a start date.");
+        return null;
+    }
+    if (Validator.isEmpty(txtEndDate.getText())) {
+        warn("Select an end date.");
+        return null;
+    }
     LocalDate start, end;
     try {
         start = Validator.parseDate(txtStartDate.getText());
         end = Validator.parseDate(txtEndDate.getText());
     } catch (DateTimeParseException ex) {
-        warn("Dates must be valid and use yyyy-MM-dd, for example 2026-10-07.");
+        warn("Please select valid start and end dates.");
         return null;
     }
     if (!end.isAfter(start)) {
@@ -283,23 +302,12 @@ private Contract readForm() {
         return null;
     }
 
-    BigDecimal deposit;
-    try {
-        deposit = new BigDecimal(txtDeposit.getText().trim());
-        if (deposit.compareTo(BigDecimal.ZERO) < 0) throw new NumberFormatException();
-    } catch (NumberFormatException ex) {
-        warn("Deposit must be a number of 0 or more.");
-        txtDeposit.requestFocus();
-        return null;
-    }
-
     Contract k = new Contract();
     k.setTenantId(((ComboItem) t).getId());
     k.setUnitId(((ComboItem) u).getId());
     k.setStartDate(start);
     k.setEndDate(end);
     k.setMonthlyRent(rent);
-    k.setDeposit(deposit);
     k.setStatus(Constants.CONTRACT_ACTIVE);
     return k;
 }
@@ -322,7 +330,6 @@ private Contract readForm() {
         lblStart = new javax.swing.JLabel();
         lblEnd = new javax.swing.JLabel();
         lblRent = new javax.swing.JLabel();
-        lblDeposit = new javax.swing.JLabel();
         txtContractId = new javax.swing.JTextField();
         cmbTenant = new javax.swing.JComboBox<>();
         cmbUnit = new javax.swing.JComboBox<>();
@@ -330,17 +337,13 @@ private Contract readForm() {
         txtStartDate = new javax.swing.JTextField();
         txtEndDate = new javax.swing.JTextField();
         txtRent = new javax.swing.JTextField();
-        txtDeposit = new javax.swing.JTextField();
         pnlButtons = new javax.swing.JPanel();
         btnSave = new javax.swing.JButton();
         btnUpdate = new javax.swing.JButton();
         btnEnd = new javax.swing.JButton();
         btnDelete = new javax.swing.JButton();
         btnClear = new javax.swing.JButton();
-        lblDeposit1 = new javax.swing.JLabel();
         lblLength = new javax.swing.JLabel();
-        lblEnd1 = new javax.swing.JLabel();
-        lblStart1 = new javax.swing.JLabel();
         jPanel1 = new javax.swing.JPanel();
         lblSearch = new javax.swing.JLabel();
         txtSearch = new javax.swing.JTextField();
@@ -394,10 +397,6 @@ private Contract readForm() {
         lblRent.setForeground(new java.awt.Color(60, 40, 55));
         lblRent.setText("Monthly Rent");
 
-        lblDeposit.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
-        lblDeposit.setForeground(new java.awt.Color(60, 40, 55));
-        lblDeposit.setText("Deposit");
-
         txtContractId.setEditable(false);
         txtContractId.setBackground(new java.awt.Color(243, 238, 241));
         txtContractId.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
@@ -433,8 +432,6 @@ private Contract readForm() {
                 txtRentKeyReleased(evt);
             }
         });
-
-        txtDeposit.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
 
         pnlButtons.setBackground(new java.awt.Color(255, 255, 255));
 
@@ -482,21 +479,9 @@ private Contract readForm() {
                 .addComponent(btnClear, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE))
         );
 
-        lblDeposit1.setFont(new java.awt.Font("Segoe UI", 2, 10)); // NOI18N
-        lblDeposit1.setForeground(new java.awt.Color(130, 110, 125));
-        lblDeposit1.setText("(2 months rent)");
-
         lblLength.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
         lblLength.setForeground(new java.awt.Color(60, 40, 55));
         lblLength.setText("Contract length: -");
-
-        lblEnd1.setFont(new java.awt.Font("Segoe UI", 2, 10)); // NOI18N
-        lblEnd1.setForeground(new java.awt.Color(130, 110, 125));
-        lblEnd1.setText("YYYY-mm-dd");
-
-        lblStart1.setFont(new java.awt.Font("Segoe UI", 2, 10)); // NOI18N
-        lblStart1.setForeground(new java.awt.Color(130, 110, 125));
-        lblStart1.setText("YYYY-mm-dd");
 
         javax.swing.GroupLayout pnlFormLayout = new javax.swing.GroupLayout(pnlForm);
         pnlForm.setLayout(pnlFormLayout);
@@ -520,18 +505,13 @@ private Contract readForm() {
                     .addGroup(pnlFormLayout.createSequentialGroup()
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(lblStart)
-                            .addComponent(lblStart1)
                             .addComponent(lblEnd)
-                            .addComponent(lblEnd1)
-                            .addComponent(lblRent)
-                            .addComponent(lblDeposit)
-                            .addComponent(lblDeposit1))
+                            .addComponent(lblRent))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(txtStartDate, javax.swing.GroupLayout.DEFAULT_SIZE, 275, Short.MAX_VALUE)
                             .addComponent(txtEndDate)
-                            .addComponent(txtRent)
-                            .addComponent(txtDeposit)))
+                            .addComponent(txtRent)))
                     .addComponent(lblLength))
                 .addGap(28, 28, 28)
                 .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -559,33 +539,17 @@ private Contract readForm() {
                             .addComponent(lblStatus)
                             .addComponent(cmbStatus, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE)))
                     .addGroup(pnlFormLayout.createSequentialGroup()
-                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addGap(5, 5, 5)
-                                .addComponent(lblStart)
-                                .addGap(0, 0, 0)
-                                .addComponent(lblStart1))
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(lblStart)
                             .addComponent(txtStartDate, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addGap(10, 10, 10)
-                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addGap(5, 5, 5)
-                                .addComponent(lblEnd)
-                                .addGap(0, 0, 0)
-                                .addComponent(lblEnd1))
+                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(lblEnd)
                             .addComponent(txtEndDate, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addGap(10, 10, 10)
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(lblRent)
                             .addComponent(txtRent, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addGap(10, 10, 10)
-                        .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(pnlFormLayout.createSequentialGroup()
-                                .addGap(5, 5, 5)
-                                .addComponent(lblDeposit)
-                                .addGap(0, 0, 0)
-                                .addComponent(lblDeposit1))
-                            .addComponent(txtDeposit, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addGap(10, 10, 10)
                         .addComponent(lblLength))
                     .addComponent(pnlButtons, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -662,11 +626,11 @@ private Contract readForm() {
 
             },
             new String [] {
-                "ID", "Tenant", "Unit", "Start Date", "End Date", "Monthly Rent", "Deposit", "Status"
+                "ID", "Tenant", "Unit", "Start Date", "End Date", "Monthly Rent", "Status"
             }
         ) {
             boolean[] canEdit = new boolean [] {
-                false, false, false, false, false, false, false, false
+                false, false, false, false, false, false, false
             };
 
             public boolean isCellEditable(int rowIndex, int columnIndex) {
@@ -752,12 +716,12 @@ private Contract readForm() {
             txtStartDate.setText(k.getStartDate().toString());
             txtEndDate.setText(k.getEndDate().toString());
             txtRent.setText(k.getMonthlyRent().toPlainString());
-            txtDeposit.setText(k.getDeposit().toPlainString());
             cmbStatus.setSelectedItem(k.getStatus());
 
             cmbTenant.setEnabled(false);
             cmbUnit.setEnabled(false);
-            txtStartDate.setEditable(false);
+            txtStartDate.setEnabled(false);   // the start date never changes after creation
+            txtEndDate.setEnabled(Constants.CONTRACT_ACTIVE.equals(k.getStatus()));   // only an Active contract can change its end date
 
             updateLength();
         } catch (SQLException ex) {
@@ -895,23 +859,13 @@ private Contract readForm() {
         Contract k = readForm();
         if (k == null) return; // validation failed
 
-        BigDecimal required = k.getMonthlyRent().multiply(BigDecimal.valueOf(DEPOSIT_MONTHS));
-        if (k.getDeposit().compareTo(required) != 0) {
-            warn(String.format("Policy: the security deposit must be %d months of rent (PHP %,.2f).",
-                DEPOSIT_MONTHS, required));
-        txtDeposit.requestFocus();
-        return;
-        }
-
         try {
             dao.createContract(k); // insert contract + unit becomes occpued, in one transaction
             JOptionPane.showMessageDialog(this, String.format(
                 "Contract created successfully.\n\n"
-                + "Move-in amounts to collect:\n"
-                + "   Security deposit (%d months): PHP %,.2f\n"
+                + "Move-in amount to collect:\n"
                 + "   Advance rent (1 month, billing month %s): PHP %,.2f\n\n"
                 + "Record the advance in the Payments screen.",
-                DEPOSIT_MONTHS, k.getDeposit(),
                 YearMonth.from(k.getStartDate()), k.getMonthlyRent()));
 
         clearForm();
@@ -922,9 +876,6 @@ private Contract readForm() {
     }//GEN-LAST:event_btnSaveActionPerformed
 
     private void txtRentKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtRentKeyReleased
-        if (txtContractId.getText().isEmpty()) {
-            fillDepositFromRent();
-        }
         updateLength();
     }//GEN-LAST:event_txtRentKeyReleased
 
@@ -993,10 +944,7 @@ private Contract readForm() {
     private javax.swing.JComboBox<String> cmbUnit;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JLabel lblContractId;
-    private javax.swing.JLabel lblDeposit;
-    private javax.swing.JLabel lblDeposit1;
     private javax.swing.JLabel lblEnd;
-    private javax.swing.JLabel lblEnd1;
     private javax.swing.JLabel lblFilter;
     private javax.swing.JLabel lblInfo;
     private javax.swing.JLabel lblLegend;
@@ -1004,7 +952,6 @@ private Contract readForm() {
     private javax.swing.JLabel lblRent;
     private javax.swing.JLabel lblSearch;
     private javax.swing.JLabel lblStart;
-    private javax.swing.JLabel lblStart1;
     private javax.swing.JLabel lblStatus;
     private javax.swing.JLabel lblTenant;
     private javax.swing.JLabel lblTitle;
@@ -1014,7 +961,6 @@ private Contract readForm() {
     private javax.swing.JScrollPane scrlContracts;
     private javax.swing.JTable tblContracts;
     private javax.swing.JTextField txtContractId;
-    private javax.swing.JTextField txtDeposit;
     private javax.swing.JTextField txtEndDate;
     private javax.swing.JTextField txtRent;
     private javax.swing.JTextField txtSearch;

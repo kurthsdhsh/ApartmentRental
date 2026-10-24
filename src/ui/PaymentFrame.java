@@ -6,7 +6,10 @@ import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.swing.JComboBox;
 import javax.swing.JOptionPane;
 import javax.swing.table.DefaultTableModel;
@@ -33,6 +36,7 @@ public class PaymentFrame extends javax.swing.JFrame {
     private final PaymentDAO dao = new PaymentDAO();
     private final ContractDAO contractDao = new ContractDAO();
     private boolean loading = false; 
+    private Contract current;
 
     public PaymentFrame() {
         initComponents();
@@ -50,6 +54,14 @@ public class PaymentFrame extends javax.swing.JFrame {
         tblPayments.getColumnModel().getColumn(0).setMaxWidth(60);
 
         installStatusColors();
+        DatePicker.attach(txtPaymentDate, null, null); 
+        cmbStatus.setEnabled(false); 
+        txtAmount.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyReleased(java.awt.event.KeyEvent e) {
+                previewStatus();
+            }
+        });
         setLocationRelativeTo(null);
         txtPaymentId.setEditable(false);       
         btnDelete.setEnabled(Session.isAdmin());
@@ -57,7 +69,6 @@ public class PaymentFrame extends javax.swing.JFrame {
         loadActiveContracts();
         refreshTable();
         updateSummary();
-        refreshBalance();
     }
     
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -83,32 +94,120 @@ private void loadActiveContracts() {
     } finally {
         loading = false;
     }
-    fillAmountFromSelectedContract();
-    refreshBalance();
+    onContractChanged();
 }
 
-// suggests the amount
-private void fillAmountFromSelectedContract() {
+
+/** The billing months a contract covers: one per month of the lease, starting at the start month. */
+private static List<YearMonth> monthsOf(Contract k) {
+    YearMonth first = YearMonth.from(k.getStartDate());
+    long n = ChronoUnit.MONTHS.between(k.getStartDate(), k.getEndDate().plusDays(1));
+    if (n < 1) n = 1;
+    List<YearMonth> list = new ArrayList<>();
+    for (int i = 0; i < n; i++) list.add(first.plusMonths(i));
+    return list;
+}
+
+private String selectedMonth() {
+    Object m = cmbBillingMonth.getSelectedItem();
+    return m == null ? null : m.toString();
+}
+
+private int excludeId() {
+    String id = txtPaymentId.getText().trim();
+    return id.isEmpty() ? 0 : Integer.parseInt(id);
+}
+
+// fills the Billing Month list with ONLY the months of the contract
+private void loadMonths(Contract k, String select) {
+    loading = true;
+    try {
+        cmbBillingMonth.removeAllItems();
+        boolean found = false;
+        for (YearMonth m : monthsOf(k)) {
+            cmbBillingMonth.addItem(m.toString());
+            if (m.toString().equals(select)) found = true;
+        }
+        if (select != null) {
+            if (!found) cmbBillingMonth.addItem(select); 
+            cmbBillingMonth.setSelectedItem(select);
+        }
+    } finally {
+        loading = false;
+    }
+}
+
+// the first month that is not fully paid yet (or the last month when everything is paid)
+private String firstUnpaidMonth(Contract k) throws SQLException {
+    Map<String, BigDecimal> paid = dao.paidByMonth(k.getContractId());
+    List<YearMonth> months = monthsOf(k);
+    for (YearMonth m : months) {
+        BigDecimal p = paid.getOrDefault(m.toString(), BigDecimal.ZERO);
+        if (p.compareTo(k.getMonthlyRent()) < 0) return m.toString();
+    }
+    return months.get(months.size() - 1).toString();
+}
+
+// called when another contract is chosen (or the list is reloaded)
+private void onContractChanged() {
     Object sel = cmbContract.getSelectedItem();
     if (!(sel instanceof ComboItem)) {
+        current = null;
+        loading = true;
+        cmbBillingMonth.removeAllItems();
+        loading = false;
+        txtAmount.setText("");
+        refreshBalance();
+        return;
+    }
+    try {
+        current = contractDao.getById(((ComboItem) sel).getId());
+        if (current == null) return;
+        loadMonths(current, firstUnpaidMonth(current));
+        fillAmountForMonth();
+        previewStatus();
+        refreshBalance();
+    } catch (SQLException ex) {
+        ErrorHelper.show(this, ex);
+    }
+}
+
+// suggests the amount: what is still unpaid for the chosen month
+private void fillAmountForMonth() {
+    String month = selectedMonth();
+    if (current == null || month == null) {
         txtAmount.setText("");
         return;
     }
     try {
-        Contract k = contractDao.getById(((ComboItem) sel).getId());
-        if (k == null) return;
-
-        BigDecimal amount = k.getMonthlyRent();       
-        try {
-            YearMonth month = YearMonth.parse(txtBillingMonth.getText().trim());
-            BigDecimal balance = k.getMonthlyRent()
-                    .subtract(dao.paidSoFar(k.getContractId(), month.toString(), 0));
-            if (balance.signum() > 0) amount = balance; 
-        } catch (DateTimeParseException ex) {
-        }
-        txtAmount.setText(amount.toPlainString());
+        BigDecimal balance = current.getMonthlyRent()
+                .subtract(dao.paidSoFar(current.getContractId(), month, 0));
+        txtAmount.setText(balance.signum() > 0 ? balance.toPlainString() : "");
     } catch (SQLException ex) {
         ErrorHelper.show(this, ex);
+    }
+}
+
+// the Status box only shows the result: enough money for the month = Paid, otherwise Partial
+private void previewStatus() {
+    if (current == null) return;
+    if (!txtPaymentId.getText().isEmpty() && Constants.PAY_VOIDED.equals(String.valueOf(cmbStatus.getSelectedItem()))) {
+        return;                                     // a voided record keeps showing Voided
+    }
+    String month = selectedMonth();
+    if (month == null) return;
+    BigDecimal amount;
+    try {
+        amount = Validator.parsePositive(txtAmount.getText());
+    } catch (NumberFormatException ex) {
+        return;
+    }
+    try {
+        BigDecimal total = dao.paidSoFar(current.getContractId(), month, excludeId()).add(amount);
+        cmbStatus.setSelectedItem(total.compareTo(current.getMonthlyRent()) >= 0
+                ? Constants.PAY_PAID : Constants.PAY_PARTIAL);
+    } catch (SQLException ex) {
+        // preview only; the real check happens on save
     }
 }
 
@@ -119,7 +218,6 @@ private void showReceivedBy() {
 
 private void resetDefaults() {
     txtPaymentId.setText("");
-    txtBillingMonth.setText(YearMonth.now().toString()); 
     txtPaymentDate.setText(LocalDate.now().toString());  
     cmbMethod.setSelectedIndex(0);
     cmbStatus.setSelectedItem("Paid");
@@ -187,42 +285,60 @@ private void updateSummary() {
     }
 }
 
-// shows how much of the chosen contract's rent is already paid 
+// shows how much of the chosen month is paid, and which months of the contract are still unpaid
 private void refreshBalance() {
-    Object sel = cmbContract.getSelectedItem();
-    if (!(sel instanceof ComboItem)) {
+    String month = selectedMonth();
+    if (current == null || month == null) {
         lblBalance.setText("Paid so far: - | Balance: -");
-        return;
-    }
-    YearMonth month;
-    try {
-        month = YearMonth.parse(txtBillingMonth.getText().trim());
-    } catch (DateTimeParseException ex) {
-        lblBalance.setText("Enter a billing month (yyyy-MM) to see the balance.");
+        lblUnpaid.setText(" ");
+        lblUnpaid.setToolTipText(null);
         return;
     }
     try {
-        Contract k = contractDao.getById(((ComboItem) sel).getId());
-        if (k == null) return;
-        BigDecimal rent = k.getMonthlyRent();
-        
-                if (contractDao.countPayments(k.getContractId()) == 0) {
-            lblBalance.setText(String.format(
-                    "No payments yet. Move-in advance: PHP %,.2f for billing month %s",
-                    rent, YearMonth.from(k.getStartDate())));
-            return;
-        }
-                
-        BigDecimal paid = dao.paidSoFar(k.getContractId(), month.toString(), 0); // 0 = count every payment
+        Map<String, BigDecimal> paidByMonth = dao.paidByMonth(current.getContractId());
+        BigDecimal rent = current.getMonthlyRent();
+        BigDecimal paid = paidByMonth.getOrDefault(month, BigDecimal.ZERO);
         BigDecimal balance = rent.subtract(paid);
+        String tag = month.equals(YearMonth.from(current.getStartDate()).toString()) ? " (move-in advance)" : "";
         if (balance.signum() <= 0) {
-            lblBalance.setText(String.format("%s: fully paid (PHP %,.2f of PHP %,.2f)", month, paid, rent));
+            lblBalance.setText(String.format("%s%s: fully paid (PHP %,.2f of PHP %,.2f)", month, tag, paid, rent));
         } else {
-            lblBalance.setText(String.format("%s | Paid so far: PHP %,.2f | Balance: PHP %,.2f", month, paid, balance));
+            lblBalance.setText(String.format("%s%s | Paid so far: PHP %,.2f | Balance: PHP %,.2f",
+                    month, tag, paid, balance));
         }
+        showUnpaidMonths(paidByMonth);
     } catch (SQLException ex) {
         lblBalance.setText("Cannot load the balance right now.");
+        lblUnpaid.setText(" ");
     }
+}
+
+// one line for the whole contract: how many months are paid and which ones are already due but unpaid
+private void showUnpaidMonths(Map<String, BigDecimal> paidByMonth) {
+    List<YearMonth> months = monthsOf(current);
+    BigDecimal rent = current.getMonthlyRent();
+    YearMonth now = YearMonth.now();
+    int fullyPaid = 0, notYetDue = 0;
+    List<String> overdue = new ArrayList<>();
+    for (YearMonth m : months) {
+        BigDecimal left = rent.subtract(paidByMonth.getOrDefault(m.toString(), BigDecimal.ZERO));
+        if (left.signum() <= 0) fullyPaid++;
+        else if (m.isAfter(now)) notYetDue++;
+        else overdue.add(String.format("%s (%,.2f)", m, left));
+    }
+    StringBuilder text = new StringBuilder(String.format("Rent paid: %d of %d months", fullyPaid, months.size()));
+    if (overdue.isEmpty()) {
+        text.append(" | No unpaid months so far");
+        lblUnpaid.setForeground(new Color(20, 100, 50));
+    } else {
+        int shown = Math.min(3, overdue.size());
+        text.append(" | UNPAID: ").append(String.join(", ", overdue.subList(0, shown)));
+        if (overdue.size() > shown) text.append(" +").append(overdue.size() - shown).append(" more");
+        lblUnpaid.setForeground(new Color(170, 30, 30));
+    }
+    if (notYetDue > 0) text.append(" | ").append(notYetDue).append(" not yet due");
+    lblUnpaid.setText(text.toString());
+    lblUnpaid.setToolTipText(overdue.isEmpty() ? null : "Unpaid months: " + String.join(", ", overdue));
 }
 
 private void clearForm() {
@@ -248,50 +364,46 @@ private void showDbError(SQLException ex) {
     }
 }
 
-//validates the form
+//validates the form and decides the status (Paid / Partial) from the amount
 private Payment readForm() {
     Object c = cmbContract.getSelectedItem();
-    if (!(c instanceof ComboItem)) {
+    if (!(c instanceof ComboItem) || current == null) {
         warn("Select a contract. If the list is empty, create a contract first.");
         return null;
     }
 
-    String month = txtBillingMonth.getText().trim();
-    YearMonth billing;
-    try {
-        billing = YearMonth.parse(month);               
-    } catch (DateTimeParseException ex) {
-        warn("Billing month must use yyyy-MM, for example 2026-10.");
-        txtBillingMonth.requestFocus();
+    String month = selectedMonth();
+    if (month == null) {
+        warn("Select a billing month.");
         return null;
     }
-    
-    // the billing month must fall inside the contract period
-    try {
-        Contract k = contractDao.getById(((ComboItem) c).getId());
-        if (k == null) {
-            warn("This contract no longer exists. Click REFRESH.");
-            return null;
-        }
-        YearMonth first = YearMonth.from(k.getStartDate());
-        YearMonth last = YearMonth.from(k.getEndDate());
-        if (billing.isBefore(first) || billing.isAfter(last)) {
-            warn("Billing month must be within the contract period (" + first + " to " + last + ").");
-            txtBillingMonth.requestFocus();
-            return null;
-        }
-    } catch (SQLException ex) {
-        ErrorHelper.show(this, ex);
-        return null;
-    }
-
 
     LocalDate date;
     try {
         date = Validator.parseDate(txtPaymentDate.getText());
     } catch (DateTimeParseException ex) {
-        warn("Payment date must be valid and use yyyy-MM-dd, for example 2026-10-07.");
-        txtPaymentDate.requestFocus();
+        warn("Select a payment date.");
+        return null;
+    }
+    if (date.isAfter(LocalDate.now())) {
+        warn("Payment date cannot be in the future.");
+        return null;
+    }
+
+    // how much of this month is still unpaid (the payment being edited is not counted against itself)
+    BigDecimal rent = current.getMonthlyRent();
+    BigDecimal remaining;
+    try {
+        remaining = rent.subtract(dao.paidSoFar(current.getContractId(), month, excludeId()));
+    } catch (SQLException ex) {
+        ErrorHelper.show(this, ex);
+        return null;
+    }
+    if (remaining.signum() <= 0) {
+        JOptionPane.showMessageDialog(this,
+                String.format("Billing month %s is already fully paid (PHP %,.2f).\n"
+                        + "No further payment is needed for this month.", month, rent),
+                "Already Paid", JOptionPane.WARNING_MESSAGE);
         return null;
     }
 
@@ -303,10 +415,9 @@ private Payment readForm() {
         txtAmount.requestFocus();
         return null;
     }
-
-    String status = cmbStatus.getSelectedItem().toString();
-    if (Constants.PAY_VOIDED.equals(status)) {
-        warn("To void a payment, use the VOID PAYMENT button.");
+    if (amount.compareTo(remaining) > 0) {
+        warn(String.format("Only PHP %,.2f is left to pay for %s.\nPlease enter that amount or less.", remaining, month));
+        txtAmount.requestFocus();
         return null;
     }
 
@@ -322,39 +433,11 @@ private Payment readForm() {
     p.setPaymentDate(date);
     p.setAmount(amount);
     p.setPaymentMethod(cmbMethod.getSelectedItem().toString());
-    p.setStatus(status);
+    p.setStatus(amount.compareTo(remaining) == 0 ? Constants.PAY_PAID : Constants.PAY_PARTIAL);
     p.setRemarks(remarks);
     return p;
 }
 
-// checks that the status matches the money. 
-    private boolean confirmStatusMatchesAmount(Payment p, int excludePaymentId) throws SQLException {
-        Contract k = contractDao.getById(p.getContractId());
-        if (k == null) return true;                    
-        BigDecimal rent = k.getMonthlyRent();
-        BigDecimal total = dao.paidSoFar(p.getContractId(), p.getBillingMonth(), excludePaymentId)
-                              .add(p.getAmount());
-        boolean markedPaid = Constants.PAY_PAID.equals(p.getStatus());
-
-        String suggestion = null, msg = null;
-        if (markedPaid && total.compareTo(rent) < 0) {
-            suggestion = Constants.PAY_PARTIAL;
-            msg = String.format("With this payment, the total for %s is PHP %,.2f, below the monthly rent of PHP %,.2f "
-                    + "(balance PHP %,.2f).\nMark it as Partial instead?",
-                    p.getBillingMonth(), total, rent, rent.subtract(total));
-        } else if (!markedPaid && total.compareTo(rent) >= 0) {
-            suggestion = Constants.PAY_PAID;
-            msg = String.format("With this payment, the total for %s is PHP %,.2f, which covers the monthly rent of PHP %,.2f.\n"
-                    + "Mark it as Paid instead?", p.getBillingMonth(), total, rent);
-        }
-        if (msg == null) return true;                  
-
-        int choice = JOptionPane.showConfirmDialog(this, msg, "Check Status",
-                JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-        if (choice == JOptionPane.CANCEL_OPTION || choice == JOptionPane.CLOSED_OPTION) return false;
-        if (choice == JOptionPane.YES_OPTION) p.setStatus(suggestion);   
-        return true;                                                    
-    }
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -371,7 +454,7 @@ private Payment readForm() {
         lblContract = new javax.swing.JLabel();
         cmbContract = new javax.swing.JComboBox<>();
         lblMonth = new javax.swing.JLabel();
-        txtBillingMonth = new javax.swing.JTextField();
+        cmbBillingMonth = new javax.swing.JComboBox<>();
         lblPayDate = new javax.swing.JLabel();
         txtPaymentDate = new javax.swing.JTextField();
         lblAmount = new javax.swing.JLabel();
@@ -391,6 +474,7 @@ private Payment readForm() {
         btnDelete = new javax.swing.JButton();
         btnClear = new javax.swing.JButton();
         lblBalance = new javax.swing.JLabel();
+        lblUnpaid = new javax.swing.JLabel();
         jPanel2 = new javax.swing.JPanel();
         lblSearch = new javax.swing.JLabel();
         txtSearch = new javax.swing.JTextField();
@@ -431,12 +515,8 @@ private Payment readForm() {
         lblMonth.setForeground(new java.awt.Color(60, 40, 55));
         lblMonth.setText("Billing Month");
 
-        txtBillingMonth.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
-        txtBillingMonth.addKeyListener(new java.awt.event.KeyAdapter() {
-            public void keyReleased(java.awt.event.KeyEvent evt) {
-                txtBillingMonthKeyReleased(evt);
-            }
-        });
+        cmbBillingMonth.setFont(new java.awt.Font("Segoe UI", 0, 13)); // NOI18N
+        cmbBillingMonth.addActionListener(this::cmbBillingMonthActionPerformed);
 
         lblPayDate.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         lblPayDate.setForeground(new java.awt.Color(60, 40, 55));
@@ -528,6 +608,10 @@ private Payment readForm() {
         lblBalance.setForeground(new java.awt.Color(60, 40, 55));
         lblBalance.setText("Paid so far: - | Balance: -");
 
+        lblUnpaid.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblUnpaid.setForeground(new java.awt.Color(60, 40, 55));
+        lblUnpaid.setText(" ");
+
         javax.swing.GroupLayout pnlFormLayout = new javax.swing.GroupLayout(pnlForm);
         pnlForm.setLayout(pnlFormLayout);
         pnlFormLayout.setHorizontalGroup(
@@ -545,7 +629,7 @@ private Payment readForm() {
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(txtPaymentId)
                             .addComponent(cmbContract, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(txtBillingMonth)
+                            .addComponent(cmbBillingMonth, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .addComponent(lblReceivedBy, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                         .addGap(28, 28, 28)
                         .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -563,7 +647,8 @@ private Payment readForm() {
                         .addComponent(lblRemarks, javax.swing.GroupLayout.PREFERRED_SIZE, 100, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(txtRemarks))
-                    .addComponent(lblBalance))
+                    .addComponent(lblBalance)
+                    .addComponent(lblUnpaid))
                 .addGap(28, 28, 28)
                 .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(16, 16, 16))
@@ -586,7 +671,7 @@ private Payment readForm() {
                                 .addGap(10, 10, 10)
                                 .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                                     .addComponent(lblMonth)
-                                    .addComponent(txtBillingMonth, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                    .addComponent(cmbBillingMonth, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
                                 .addGap(18, 18, 18)
                                 .addGroup(pnlFormLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                                     .addComponent(lblReceivedByCaption)
@@ -612,7 +697,9 @@ private Payment readForm() {
                             .addComponent(lblRemarks)
                             .addComponent(txtRemarks, javax.swing.GroupLayout.PREFERRED_SIZE, 32, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addGap(10, 10, 10)
-                        .addComponent(lblBalance))
+                        .addComponent(lblBalance)
+                        .addGap(4, 4, 4)
+                        .addComponent(lblUnpaid))
                     .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(22, Short.MAX_VALUE))
         );
@@ -771,8 +858,7 @@ private Payment readForm() {
 
     private void cmbContractActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbContractActionPerformed
         if (loading || !cmbContract.isEnabled()) return;
-        fillAmountFromSelectedContract();
-        refreshBalance();
+        onContractChanged();
     }//GEN-LAST:event_cmbContractActionPerformed
 
     private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed
@@ -799,7 +885,8 @@ private Payment readForm() {
                     "C-" + p.getContractId() + " | Unit " + p.getUnitNo() + " | " + p.getTenantName()));
             loading = false;
 
-            txtBillingMonth.setText(p.getBillingMonth());
+            current = contractDao.getById(p.getContractId());
+            if (current != null) loadMonths(current, p.getBillingMonth());
             txtPaymentDate.setText(p.getPaymentDate().toString());
             txtAmount.setText(p.getAmount().toPlainString());
             cmbMethod.setSelectedItem(p.getPaymentMethod());
@@ -829,18 +916,8 @@ private Payment readForm() {
         p.setUserId(user.getUserId()); 
 
         try {
-            // duplicate month payment warning
-            if (dao.existsPaid(p.getContractId(), p.getBillingMonth())) {
-                int ok = JOptionPane.showConfirmDialog(this,
-                        "A payment for this month already exists. Save anyway?",
-                        "Duplicate Month", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-                if (ok != JOptionPane.YES_OPTION) return;
-            }
-            
-            if (!confirmStatusMatchesAmount(p, 0)) return; 
-            
             dao.add(p);
-            JOptionPane.showMessageDialog(this, "Payment saved successfully.");
+            JOptionPane.showMessageDialog(this, "Payment saved successfully (" + p.getStatus() + ").");
             clearForm();
             refreshTable();
             updateSummary();
@@ -872,8 +949,6 @@ private Payment readForm() {
                 warn("A voided payment cannot be edited.");
                 return;
             }
-            
-            if (!confirmStatusMatchesAmount(p, p.getPaymentId())) return;  
             
             dao.update(p);
             JOptionPane.showMessageDialog(this, "Payment updated successfully.");
@@ -923,16 +998,17 @@ private Payment readForm() {
         updateSummary();
         if (txtPaymentId.getText().isEmpty()) {   
             loadActiveContracts();               
-            refreshBalance();
         }
     }//GEN-LAST:event_btnRefreshActionPerformed
 
-    private void txtBillingMonthKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtBillingMonthKeyReleased
+    private void cmbBillingMonthActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbBillingMonthActionPerformed
+        if (loading || current == null) return;
+        if (txtPaymentId.getText().isEmpty()) {      // a new payment: suggest what is left for that month
+            fillAmountForMonth();
+        }
+        previewStatus();
         refreshBalance();
-        if (txtPaymentId.getText().isEmpty()) { 
-            fillAmountFromSelectedContract();
-}
-    }//GEN-LAST:event_txtBillingMonthKeyReleased
+    }//GEN-LAST:event_cmbBillingMonthActionPerformed
 
     private void btnBackActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnBackActionPerformed
         dispose();      // closes this window; the Dashboard comes back
@@ -972,6 +1048,7 @@ private Payment readForm() {
     private javax.swing.JButton btnSearch;
     private javax.swing.JButton btnUpdate;
     private javax.swing.JButton btnVoid;
+    private javax.swing.JComboBox<String> cmbBillingMonth;
     private javax.swing.JComboBox<String> cmbContract;
     private javax.swing.JComboBox<String> cmbMethod;
     private javax.swing.JComboBox<String> cmbStatus;
@@ -992,11 +1069,11 @@ private Payment readForm() {
     private javax.swing.JLabel lblSearch;
     private javax.swing.JLabel lblStatus;
     private javax.swing.JLabel lblSummary;
+    private javax.swing.JLabel lblUnpaid;
     private javax.swing.JPanel pnlForm;
     private javax.swing.JScrollPane scrlPayments;
     private javax.swing.JTable tblPayments;
     private javax.swing.JTextField txtAmount;
-    private javax.swing.JTextField txtBillingMonth;
     private javax.swing.JTextField txtPaymentDate;
     private javax.swing.JTextField txtPaymentId;
     private javax.swing.JTextField txtRemarks;
