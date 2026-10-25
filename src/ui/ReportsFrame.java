@@ -2,6 +2,7 @@ package ui;
 
 import dao.ReportDAO;
 import java.awt.Color;
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.YearMonth;
 import javax.swing.DefaultComboBoxModel;
@@ -14,13 +15,29 @@ public class ReportsFrame extends javax.swing.JFrame {
     private final ReportDAO dao = new ReportDAO();
     private boolean loading = true;     
 
+    // Report names, in the same order as runReport() below.
+    private static final String[] REPORTS = {
+        "Unit occupancy", "Tenant directory", "Rent collected (who paid)",
+        "Rent owed (who still owes)", "Open maintenance (urgent first)", "Leases ending in 30 days"
+    };
+
+    // One line per report: the question it answers, shown under the dropdown.
+    private static final String[] PURPOSE = {
+        "Which units are earning, which are empty (lost income), and when each lease ends.",
+        "Who your tenants are and how to reach them, with the unit and lease end of each.",
+        "Who paid for the chosen month, how much, by what method, and who received it.",
+        "Who has not fully paid the chosen month, how much they still owe, and their contact number to follow up.",
+        "Repairs still waiting, most urgent first, with how many days each has been open.",
+        "Leases that end within 30 days, so you can renew them or find a new tenant."
+    };
+
     private static final String[][] HEADERS = {
-        {"Unit", "Type", "Monthly Rent (PHP)", "Status", "Current Tenant"},
-        {"ID", "Tenant", "Contact No", "Email", "Active Unit"},
-        {"Billing Month", "Payments", "Total Collected (PHP)"},
-        {"Contract ID", "Tenant", "Unit", "Monthly Rent (PHP)"},
-        {"ID", "Unit", "Tenant", "Description", "Priority", "Date Reported", "Status"},
-        {"Contract ID", "Tenant", "Unit", "End Date"}
+        {"Unit", "Type", "Monthly Rent (PHP)", "Status", "Current Tenant", "Lease Ends"},
+        {"Tenant", "Contact No", "Email", "Unit", "Lease Ends"},
+        {"Tenant", "Unit", "Date Paid", "Amount (PHP)", "Method", "Status", "Received By"},
+        {"Tenant", "Contact No", "Unit", "Monthly Rent (PHP)", "Paid (PHP)", "Balance (PHP)", "Status"},
+        {"Unit", "Tenant", "Description", "Priority", "Date Reported", "Status", "Days Open"},
+        {"Tenant", "Contact No", "Unit", "Monthly Rent (PHP)", "Lease Ends", "Days Left"}
     };
 
     public ReportsFrame() {
@@ -30,18 +47,20 @@ public class ReportsFrame extends javax.swing.JFrame {
         PillButtonUI.apply(btnBack, Theme.SIDEBAR, Color.WHITE);
         TableStyle.apply(tblReport);
 
+        cmbReport.setModel(new DefaultComboBoxModel<>(REPORTS));
         String[] months = new String[12];
         YearMonth ym = YearMonth.now();
         for (int i = 0; i < 12; i++) {
             months[i] = ym.minusMonths(i).toString();
         }
         cmbMonth.setModel(new DefaultComboBoxModel<>(months));
-        showMonthBox(false);                  
+        showMonthBox(false);
 
         loading = false;
-        generate();                           
+        generate();
     }
 
+    // The month box is needed only by the two rent reports (index 2 and 3).
     private void showMonthBox(boolean show) {
         lblMonth.setVisible(show);
         cmbMonth.setVisible(show);
@@ -57,10 +76,9 @@ public class ReportsFrame extends javax.swing.JFrame {
                 model.setColumnIdentifiers(HEADERS[which]);
             }
             tblReport.setModel(model);
-            TableStyle.apply(tblReport);                   
-            int n = model.getRowCount();
-            String title = (which == 3) ? "Overdue rent for " + month : String.valueOf(cmbReport.getSelectedItem());
-            lblInfo.setText(title + ": " + (n == 0 ? "no records found." : n + " record(s)"));
+            TableStyle.apply(tblReport);                   // a new model resets the look, so apply it again
+            lblHint.setText(PURPOSE[which]);
+            lblInfo.setText(summary(which, month, model));
         } catch (SQLException ex) {
             ErrorHelper.show(this, ex);
         }
@@ -68,13 +86,76 @@ public class ReportsFrame extends javax.swing.JFrame {
 
     private DefaultTableModel runReport(int which, String month) throws SQLException {
         switch (which) {
-            case 0: return dao.unitOccupancy();
-            case 1: return dao.tenantList();
-            case 2: return dao.monthlyCollection();
-            case 3: return dao.overdueRent(month);
-            case 4: return dao.openMaintenance();
-            default: return dao.expiringSoon();
+            case 0: return dao.unitOccupancyDetailed();
+            case 1: return dao.tenantDirectory();
+            case 2: return dao.paymentsForMonth(month);
+            case 3: return dao.rentOwed(month);
+            case 4: return dao.openMaintenanceByPriority();
+            default: return dao.leasesEndingSoon();
         }
+    }
+
+    // The one-line takeaway under the table (the numbers a manager actually needs).
+    private String summary(int which, String month, DefaultTableModel m) {
+        int n = m.getRowCount();
+        switch (which) {
+            case 0: {
+                int occupied = countEquals(m, 3, "Occupied");
+                int available = countEquals(m, 3, "Available");
+                BigDecimal idle = sumWhere(m, 2, 3, "Available");
+                return n + " unit(s): " + occupied + " occupied, " + available + " available, "
+                        + (n - occupied - available) + " under maintenance. Available units are not earning PHP "
+                        + money(idle) + " per month.";
+            }
+            case 1:
+                return n + " tenant(s), " + (n - countEquals(m, 3, "-")) + " with an active lease.";
+            case 2:
+                return n == 0 ? "No payments recorded for " + month + "."
+                        : n + " payment(s) for " + month + ": PHP " + money(sum(m, 3)) + " collected.";
+            case 3:
+                return n == 0 ? "Everyone with an active lease has paid in full for " + month + "."
+                        : n + " tenant(s) still owe PHP " + money(sum(m, 5)) + " for " + month + ". Follow up with them.";
+            case 4: {
+                int hot = countEquals(m, 3, "Urgent") + countEquals(m, 3, "High");
+                return n == 0 ? "No open maintenance requests."
+                        : n + " open request(s), " + hot + " urgent or high priority.";
+            }
+            default:
+                return n == 0 ? "No lease ends in the next 30 days."
+                        : n + " lease(s) end within 30 days. PHP " + money(sum(m, 3)) + " of monthly rent is up for renewal.";
+        }
+    }
+
+    private static int countEquals(DefaultTableModel m, int col, String value) {
+        int c = 0;
+        for (int i = 0; i < m.getRowCount(); i++) {
+            if (value.equals(String.valueOf(m.getValueAt(i, col)))) c++;
+        }
+        return c;
+    }
+
+    private static BigDecimal sum(DefaultTableModel m, int col) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (int i = 0; i < m.getRowCount(); i++) {
+            Object v = m.getValueAt(i, col);
+            if (v instanceof BigDecimal) total = total.add((BigDecimal) v);
+        }
+        return total;
+    }
+
+    private static BigDecimal sumWhere(DefaultTableModel m, int valueCol, int testCol, String test) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (int i = 0; i < m.getRowCount(); i++) {
+            Object v = m.getValueAt(i, valueCol);
+            if (test.equals(String.valueOf(m.getValueAt(i, testCol))) && v instanceof BigDecimal) {
+                total = total.add((BigDecimal) v);
+            }
+        }
+        return total;
+    }
+
+    private static String money(BigDecimal v) {
+        return String.format("%,.2f", v);
     }
 
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
@@ -227,7 +308,7 @@ public class ReportsFrame extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void cmbReportActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmbReportActionPerformed
-        showMonthBox(cmbReport.getSelectedIndex() == 3);   
+        showMonthBox(cmbReport.getSelectedIndex() == 2 || cmbReport.getSelectedIndex() == 3);   
         generate();
     }//GEN-LAST:event_cmbReportActionPerformed
 
