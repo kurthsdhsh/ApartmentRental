@@ -38,6 +38,7 @@ public class UserFrame extends javax.swing.JFrame {
         btnSave.setEnabled(admin);
         btnUpdate.setEnabled(admin);
 
+        setupKeyboard();
         clearForm();
         loadTable("");
         if (!admin) {
@@ -45,6 +46,34 @@ public class UserFrame extends javax.swing.JFrame {
         }
     }
 
+
+
+    // ---- Keyboard: Tab or Enter moves to the next box ----
+    // Save / Update are clicked manually.
+    private void enterGoesTo(javax.swing.JTextField from, java.awt.Component to) {
+        from.addActionListener(e -> to.requestFocusInWindow());
+    }
+
+    private void setupKeyboard() {
+        txtUserId.setFocusable(false);               // Tab skips the read-only ID
+        enterGoesTo(txtUsername, txtPassword);
+        enterGoesTo(txtPassword, txtConfirm);
+        enterGoesTo(txtConfirm, txtFullName);
+        txtSearch.addActionListener(e -> btnSearch.doClick());
+    }
+
+
+    // Asks twice before deleting. Both answers must be Yes.
+    private boolean confirmDeleteTwice(String what) {
+        int first = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to delete " + what + "?",
+                "Confirm Delete (1 of 2)", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (first != JOptionPane.YES_OPTION) return false;
+        int second = JOptionPane.showConfirmDialog(this,
+                "This cannot be undone. Delete " + what + " permanently?",
+                "Final Confirmation (2 of 2)", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        return second == JOptionPane.YES_OPTION;
+    }
 
     private void loadTable(String keyword) {
         try {
@@ -496,10 +525,7 @@ public class UserFrame extends javax.swing.JFrame {
                 warn("You cannot delete the last Admin.");
                 return;
             }
-            int ok = JOptionPane.showConfirmDialog(this,
-                    "Are you sure you want to delete the user \"" + target.getUsername() + "\"?",
-                    "Confirm Delete", JOptionPane.YES_NO_OPTION);
-            if (ok != JOptionPane.YES_OPTION) return;
+            if (!confirmDeleteTwice("the user \"" + target.getUsername() + "\"")) return;
             dao.delete(id);
             info("User deleted.");
             clearForm();

@@ -32,8 +32,39 @@ public class TenantFrame extends javax.swing.JFrame {
 
         btnDelete.setEnabled(Session.isAdmin());     
 
+        setupKeyboard();
         clearForm();
         loadTable("");
+    }
+
+
+    // ---- Keyboard: Tab or Enter moves to the next box ----
+    // Save / Update are clicked manually.
+    private void enterGoesTo(javax.swing.JTextField from, java.awt.Component to) {
+        from.addActionListener(e -> to.requestFocusInWindow());
+    }
+
+    private void setupKeyboard() {
+        txtTenantId.setFocusable(false);             // Tab skips read-only boxes
+        txtCurrentUnit.setFocusable(false);
+        enterGoesTo(txtFirstName, txtLastName);
+        enterGoesTo(txtLastName, txtContact);
+        enterGoesTo(txtContact, txtEmail);
+        enterGoesTo(txtEmail, txtAddress);
+        txtSearch.addActionListener(e -> btnSearch.doClick());
+    }
+
+
+    // Asks twice before deleting. Both answers must be Yes.
+    private boolean confirmDeleteTwice(String what) {
+        int first = JOptionPane.showConfirmDialog(this,
+                "Are you sure you want to delete " + what + "?",
+                "Confirm Delete (1 of 2)", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (first != JOptionPane.YES_OPTION) return false;
+        int second = JOptionPane.showConfirmDialog(this,
+                "This cannot be undone. Delete " + what + " permanently?",
+                "Final Confirmation (2 of 2)", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        return second == JOptionPane.YES_OPTION;
     }
 
     private void loadTable(String keyword) {
@@ -472,10 +503,7 @@ public class TenantFrame extends javax.swing.JFrame {
                 warn("This tenant has contracts or maintenance requests, so the record cannot be deleted.");
                 return;
             }
-            int ok = JOptionPane.showConfirmDialog(this,
-                    "Are you sure you want to delete " + txtFirstName.getText() + " " + txtLastName.getText() + "?",
-                    "Confirm Delete", JOptionPane.YES_NO_OPTION);
-            if (ok != JOptionPane.YES_OPTION) return;
+            if (!confirmDeleteTwice(txtFirstName.getText() + " " + txtLastName.getText())) return;
             dao.delete(id);
             info("Tenant deleted.");
             clearForm();
